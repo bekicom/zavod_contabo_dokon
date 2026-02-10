@@ -17,6 +17,7 @@
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "mongoose": "^9.1.6",
+    "vercel": "^50.14.0",
     "ws": "^8.19.0"
   },
   "devDependencies": {

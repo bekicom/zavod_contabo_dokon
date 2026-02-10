@@ -3,8 +3,6 @@ const express = require("express");
 const cors = require("cors");
 
 const connectDB = require("./config/db");
-
-// ROUTES
 const globalStockRoutes = require("./routes/globalStockRoutes");
 
 const app = express();
@@ -14,6 +12,32 @@ const app = express();
 ========================= */
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
+
+/* =========================
+   DB CONNECT (SAFE FOR VERCEL)
+========================= */
+let isConnected = false;
+
+async function ensureDB() {
+  if (!isConnected) {
+    await connectDB();
+    isConnected = true;
+    console.log("✅ Global MongoDB ulandi");
+  }
+}
+
+app.use(async (req, res, next) => {
+  try {
+    await ensureDB();
+    next();
+  } catch (err) {
+    console.error("❌ Mongo connect error:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "MongoDB ulanishda xatolik",
+    });
+  }
+});
 
 /* =========================
    ROUTES
@@ -26,7 +50,7 @@ app.use("/api/global", globalStockRoutes);
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "🌍 SORA GLOBAL SERVER ishlayapti",
+    message: "🌍 SORA GLOBAL API (Vercel)",
     time: new Date().toISOString(),
   });
 });
@@ -53,13 +77,11 @@ app.use((err, req, res, next) => {
 });
 
 /* =========================
-   START SERVER
+   EXPORT FOR VERCEL
 ========================= */
-const PORT = process.env.PORT || 4000;
 
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Global server ${PORT}-portda ishga tushdi`);
-    console.log(`🔗 http://localhost:${PORT}`);
-  });
-});
+// server run boldi listen
+
+
+
+module.exports = app;
