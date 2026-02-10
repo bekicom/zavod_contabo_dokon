@@ -1,7 +1,7 @@
 const GlobalBranchStock = require("../models/GlobalBranchStock");
 
 /* ===================================================
-   🌱 Zavoddan filial omboriga boshlang‘ich seed
+   🌱 Zavoddan filialga mahsulotni RO‘YXATGA QO‘SHISH
    POST /api/global/stock/seed
 =================================================== */
 exports.seedBranchStock = async (req, res) => {
@@ -18,46 +18,39 @@ exports.seedBranchStock = async (req, res) => {
     const results = [];
 
     for (const item of items) {
-      const { mahsulot, miqdor, birlik } = item;
+      const { mahsulot, birlik } = item;
+      if (!mahsulot) continue;
 
-      if (!mahsulot || !miqdor || miqdor <= 0) continue;
-
-      const filter = {
-        branch_code,
-        mahsulot,
-      };
-
-      const update = {
-        $inc: { miqdor: Number(miqdor) },
-        $setOnInsert: {
-          branch_code,
-          mahsulot,
-          birlik: birlik || "dona",
-          source: "factory",
-        },
-        $push: {
-          tarix: {
-            miqdor: Number(miqdor),
-            amal: "seed",
-            izoh: sent_by || "factory-admin",
-            sana: new Date(),
+      const doc = await GlobalBranchStock.findOneAndUpdate(
+        { branch_code, mahsulot },
+        {
+          $setOnInsert: {
+            branch_code,
+            mahsulot,
+            birlik: birlik || "dona",
+            source: "factory",
+            miqdor: 0,
+          },
+          $push: {
+            tarix: {
+              miqdor: 0,
+              amal: "seed",
+              izoh: sent_by || "factory-admin",
+              sana: new Date(),
+            },
           },
         },
-      };
-
-      const doc = await GlobalBranchStock.findOneAndUpdate(filter, update, {
-        upsert: true,
-        new: true,
-      });
+        { upsert: true, new: true },
+      );
 
       results.push(doc);
     }
 
     res.json({
       success: true,
-      message: "✅ Filial ombori muvaffaqiyatli to‘ldirildi",
+      message: "✅ Mahsulotlar filialga ruxsat sifatida qo‘shildi",
       count: results.length,
-      data: results,
+      data: results.map((i) => i.mahsulot),
     });
   } catch (err) {
     console.error("seedBranchStock error:", err);
@@ -68,8 +61,9 @@ exports.seedBranchStock = async (req, res) => {
   }
 };
 
+
 /* ===================================================
-   📦 Filial omborini olish
+   📦 Filialga RUXSAT ETILGAN mahsulotlar
    GET /api/global/stock/:branch_code
 =================================================== */
 exports.getBranchStock = async (req, res) => {
@@ -83,9 +77,7 @@ exports.getBranchStock = async (req, res) => {
       });
     }
 
-    const list = await GlobalBranchStock.find({
-      branch_code,
-    })
+    const list = await GlobalBranchStock.find({ branch_code })
       .sort({ mahsulot: 1 })
       .lean();
 
@@ -96,9 +88,6 @@ exports.getBranchStock = async (req, res) => {
       data: list.map((item) => ({
         mahsulot: item.mahsulot,
         birlik: item.birlik,
-        miqdor: item.miqdor,
-        source: item.source,
-        updatedAt: item.updatedAt,
       })),
     });
   } catch (err) {
@@ -109,3 +98,4 @@ exports.getBranchStock = async (req, res) => {
     });
   }
 };
+
