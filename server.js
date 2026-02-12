@@ -82,6 +82,4 @@ app.use((err, req, res, next) => {
 
 // server run boldi listen
 
-
-
 module.exports = app;
