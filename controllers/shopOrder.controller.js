@@ -129,3 +129,40 @@ exports.rejectOrder = async (req, res) => {
     });
   }
 };
+
+/* =========================
+   RECEIVE ORDER (Dokon qabul qiladi)
+========================= */
+exports.receiveOrder = async (req, res) => {
+  try {
+    const order = await ShopOrder.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order topilmadi",
+      });
+    }
+
+    if (order.status !== "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message: "Faqat APPROVED order qabul qilinadi",
+      });
+    }
+
+    order.status = "RECEIVED";
+    await order.save();
+
+    res.json({
+      success: true,
+      message: "Order qabul qilindi",
+      data: order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

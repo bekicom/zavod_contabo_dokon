@@ -18,6 +18,8 @@ router.post("/shop-orders", createOrder);
 router.get("/shop-orders", getAllOrders);
 router.patch("/shop-orders/:id/approve", approveOrder);
 router.patch("/shop-orders/:id/reject", rejectOrder);
+router.patch("/shop-orders/:id/receive", receiveOrder);
+
 
 
 module.exports = router;
