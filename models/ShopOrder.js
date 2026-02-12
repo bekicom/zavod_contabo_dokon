@@ -26,12 +26,11 @@ const shopOrderSchema = new mongoose.Schema(
       enum: ["dona", "kg"],
     },
 
-    status: {
-      type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED"],
-      default: "PENDING",
-      index: true,
-    },
+   status: {
+  type: String,
+  enum: ["PENDING", "APPROVED", "REJECTED", "RECEIVED"],
+  default: "PENDING",
+},
 
     approved_at: {
       type: Date,
