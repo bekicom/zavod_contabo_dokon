@@ -1,7 +1,7 @@
 const ShopOrder = require("../models/ShopOrder");
 
 /* =========================
-   CREATE ORDER (Dokondan keladi)
+   CREATE ORDER
 ========================= */
 exports.createOrder = async (req, res) => {
   try {
@@ -19,6 +19,7 @@ exports.createOrder = async (req, res) => {
       product_name,
       qty,
       unit,
+      status: "PENDING",
     });
 
     res.status(201).json({
@@ -27,7 +28,6 @@ exports.createOrder = async (req, res) => {
       data: order,
     });
   } catch (error) {
-    console.error("❌ createOrder:", error.message);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -36,7 +36,7 @@ exports.createOrder = async (req, res) => {
 };
 
 /* =========================
-   GET ALL ORDERS (Zavod ko‘radi)
+   GET ALL ORDERS
 ========================= */
 exports.getAllOrders = async (req, res) => {
   try {
@@ -56,7 +56,33 @@ exports.getAllOrders = async (req, res) => {
 };
 
 /* =========================
-   APPROVE ORDER (Zavod tasdiqlaydi)
+   GET ORDER BY ID  🔥 (DOKONGA KERAK)
+========================= */
+exports.getOrderById = async (req, res) => {
+  try {
+    const order = await ShopOrder.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order topilmadi",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/* =========================
+   APPROVE ORDER
 ========================= */
 exports.approveOrder = async (req, res) => {
   try {
@@ -131,7 +157,7 @@ exports.rejectOrder = async (req, res) => {
 };
 
 /* =========================
-   RECEIVE ORDER (Dokon qabul qiladi)
+   RECEIVE ORDER
 ========================= */
 exports.receiveOrder = async (req, res) => {
   try {
@@ -152,6 +178,7 @@ exports.receiveOrder = async (req, res) => {
     }
 
     order.status = "RECEIVED";
+    order.received_at = new Date();
     await order.save();
 
     res.json({
