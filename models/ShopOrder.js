@@ -14,6 +14,7 @@ const OrderItemSchema = new mongoose.Schema(
     },
     unit: {
       type: String,
+      enum: ["kg", "dona", "pachka", "blok"],
       default: "dona",
     },
   },
