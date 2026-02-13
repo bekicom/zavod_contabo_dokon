@@ -16,7 +16,7 @@ const GlobalBranchStockSchema = new mongoose.Schema(
 
     birlik: {
       type: String,
-      default: "dona",
+      enum: ["kg", "dona", "pachka", "blok"],
     },
 
     miqdor: {
