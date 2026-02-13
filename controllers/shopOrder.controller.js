@@ -17,6 +17,7 @@ exports.createOrder = async (req, res) => {
     const order = await ShopOrder.create({
       shop_name,
       items,
+      status: "PENDING",
     });
 
     res.status(201).json({
@@ -32,13 +33,23 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-
 /* =========================
-   GET ALL ORDERS
+   GET ALL ORDERS (RECEIVED ko‘rsatmaymiz)
 ========================= */
 exports.getAllOrders = async (req, res) => {
   try {
-    const orders = await ShopOrder.find().sort({ createdAt: -1 });
+    const { status } = req.query;
+
+    let filter = {};
+
+    if (status) {
+      filter.status = status;
+    } else {
+      // default holda RECEIVED ko‘rsatmaymiz
+      filter.status = { $ne: "RECEIVED" };
+    }
+
+    const orders = await ShopOrder.find(filter).sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -54,7 +65,7 @@ exports.getAllOrders = async (req, res) => {
 };
 
 /* =========================
-   GET ORDER BY ID  🔥 (DOKONGA KERAK)
+   GET ORDER BY ID
 ========================= */
 exports.getOrderById = async (req, res) => {
   try {
