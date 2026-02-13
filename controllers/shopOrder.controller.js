@@ -5,21 +5,18 @@ const ShopOrder = require("../models/ShopOrder");
 ========================= */
 exports.createOrder = async (req, res) => {
   try {
-    const { shop_name, product_name, qty, unit } = req.body;
+    const { shop_name, items } = req.body;
 
-    if (!shop_name || !product_name || !qty || !unit) {
+    if (!shop_name || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Ma'lumot yetarli emas",
+        message: "Shop yoki items noto‘g‘ri",
       });
     }
 
     const order = await ShopOrder.create({
       shop_name,
-      product_name,
-      qty,
-      unit,
-      status: "PENDING",
+      items,
     });
 
     res.status(201).json({
@@ -34,6 +31,7 @@ exports.createOrder = async (req, res) => {
     });
   }
 };
+
 
 /* =========================
    GET ALL ORDERS

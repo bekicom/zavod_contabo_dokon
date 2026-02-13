@@ -1,6 +1,26 @@
 const mongoose = require("mongoose");
 
-const shopOrderSchema = new mongoose.Schema(
+const OrderItemSchema = new mongoose.Schema(
+  {
+    product_name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    qty: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    unit: {
+      type: String,
+      default: "dona",
+    },
+  },
+  { _id: false },
+);
+
+const ShopOrderSchema = new mongoose.Schema(
   {
     shop_name: {
       type: String,
@@ -8,36 +28,21 @@ const shopOrderSchema = new mongoose.Schema(
       trim: true,
     },
 
-    product_name: {
+    items: {
+      type: [OrderItemSchema],
+      required: true,
+    },
+
+    status: {
       type: String,
-      required: true,
-      trim: true,
+      enum: ["PENDING", "APPROVED", "REJECTED", "RECEIVED"],
+      default: "PENDING",
     },
 
-    qty: {
-      type: Number,
-      required: true,
-      min: 0.01,
-    },
-
-    unit: {
-      type: String,
-      required: true,
-      enum: ["dona", "kg"],
-    },
-
-   status: {
-  type: String,
-  enum: ["PENDING", "APPROVED", "REJECTED", "RECEIVED"],
-  default: "PENDING",
-},
-
-    approved_at: {
-      type: Date,
-      default: null,
-    },
+    approved_at: Date,
+    received_at: Date,
   },
   { timestamps: true },
 );
 
-module.exports = mongoose.model("ShopOrder", shopOrderSchema);
+module.exports = mongoose.model("ShopOrder", ShopOrderSchema);
