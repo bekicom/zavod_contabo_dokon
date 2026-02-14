@@ -7,11 +7,14 @@ const OrderItemSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    qty: {
+
+    soni: {
+      // 🔥 qty o‘rniga soni
       type: Number,
       required: true,
       min: 1,
     },
+
     unit: {
       type: String,
       enum: ["kg", "dona", "pachka", "blok"],
