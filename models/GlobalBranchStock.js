@@ -24,6 +24,13 @@ const GlobalBranchStockSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // ✅ YANGI: mahsulotning amaldagi narxi
+    narx: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     // qayerdan keldi (zavod)
     source: {
       type: String,
@@ -34,6 +41,14 @@ const GlobalBranchStockSchema = new mongoose.Schema(
     tarix: [
       {
         miqdor: Number,
+
+        // ✅ YANGI: shu amal vaqtida narx qancha bo‘lgan
+        narx: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+
         amal: {
           type: String,
           enum: ["seed", "plus", "minus"],

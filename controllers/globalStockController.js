@@ -18,8 +18,16 @@ exports.seedBranchStock = async (req, res) => {
     const results = [];
 
     for (const item of items) {
-      const { mahsulot, birlik } = item;
+      const { mahsulot, birlik, narx } = item;
       if (!mahsulot) continue;
+
+      const parsedNarx = Number(narx ?? 0);
+      if (Number.isNaN(parsedNarx) || parsedNarx < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `${mahsulot} uchun narx noto‘g‘ri`,
+        });
+      }
 
       const doc = await GlobalBranchStock.findOneAndUpdate(
         { branch_code, mahsulot },
@@ -31,9 +39,15 @@ exports.seedBranchStock = async (req, res) => {
             source: "factory",
             miqdor: 0,
           },
+          // mavjud bo'lsa ham narxni yangilaymiz
+          $set: {
+            birlik: birlik || "dona",
+            narx: parsedNarx,
+          },
           $push: {
             tarix: {
               miqdor: 0,
+              narx: parsedNarx,
               amal: "seed",
               izoh: sent_by || "factory-admin",
               sana: new Date(),
@@ -50,7 +64,11 @@ exports.seedBranchStock = async (req, res) => {
       success: true,
       message: "✅ Mahsulotlar filialga ruxsat sifatida qo‘shildi",
       count: results.length,
-      data: results.map((i) => i.mahsulot),
+      data: results.map((i) => ({
+        mahsulot: i.mahsulot,
+        birlik: i.birlik,
+        narx: i.narx || 0,
+      })),
     });
   } catch (err) {
     console.error("seedBranchStock error:", err);
@@ -60,7 +78,6 @@ exports.seedBranchStock = async (req, res) => {
     });
   }
 };
-
 
 /* ===================================================
    📦 Filialga RUXSAT ETILGAN mahsulotlar
@@ -88,6 +105,7 @@ exports.getBranchStock = async (req, res) => {
       data: list.map((item) => ({
         mahsulot: item.mahsulot,
         birlik: item.birlik,
+        narx: item.narx || 0,
       })),
     });
   } catch (err) {
@@ -98,4 +116,3 @@ exports.getBranchStock = async (req, res) => {
     });
   }
 };
-
