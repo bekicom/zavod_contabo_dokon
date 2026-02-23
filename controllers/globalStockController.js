@@ -8,8 +8,8 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
      "branch_code": "navoiy",
      "sent_by": "factory-admin",
      "items": [
-       { "mahsulot": "Goshtli somsa", "birlik": "dona", "narx": 12000 },
-       { "mahsulot": "Shakar", "birlik": "kg", "narx": 15000 }
+       { "mahsulot": "Goshtli somsa", "birlik": "dona", "price": 12000 },
+       { "mahsulot": "Shakar", "birlik": "kg", "price": 15000 }
      ]
    }
 =================================================== */
@@ -32,12 +32,12 @@ exports.seedBranchStock = async (req, res) => {
       if (!mahsulot) continue;
 
       const birlik = raw?.birlik ? String(raw.birlik).trim() : "dona";
-      const parsedNarx = Number(raw?.narx ?? 0);
+      const parsedprice = Number(raw?.price ?? 0);
 
-      if (Number.isNaN(parsedNarx) || parsedNarx < 0) {
+      if (Number.isNaN(parsedprice) || parsedprice < 0) {
         return res.status(400).json({
           success: false,
-          message: `${mahsulot} uchun narx noto‘g‘ri`,
+          message: `${mahsulot} uchun price noto‘g‘ri`,
         });
       }
 
@@ -53,12 +53,12 @@ exports.seedBranchStock = async (req, res) => {
           },
           $set: {
             birlik,
-            narx: parsedNarx,
+            price: parsedprice,
           },
           $push: {
             tarix: {
               miqdor: 0,
-              narx: parsedNarx,
+              price: parsedprice,
               amal: "seed",
               izoh: sent_by || "factory-admin",
               sana: new Date(),
@@ -80,7 +80,7 @@ exports.seedBranchStock = async (req, res) => {
         mahsulot: i.mahsulot,
         birlik: i.birlik,
         miqdor: i.miqdor,
-        narx: i.narx || 0,
+        price: i.price || 0,
       })),
     });
   } catch (err) {
@@ -122,7 +122,7 @@ exports.getBranchStock = async (req, res) => {
         mahsulot: item.mahsulot,
         birlik: item.birlik,
         miqdor: item.miqdor,
-        narx: item.narx || 0,
+        price: item.price || 0,
         source: item.source || "factory",
         updatedAt: item.updatedAt,
       })),

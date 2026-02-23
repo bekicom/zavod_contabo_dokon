@@ -24,8 +24,8 @@ const GlobalBranchStockSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // ✅ YANGI: mahsulotning amaldagi narxi
-    narx: {
+    // ✅ YANGI: mahsulotning amaldagi pricei
+    price: {
       type: Number,
       default: 0,
       min: 0,
@@ -42,8 +42,8 @@ const GlobalBranchStockSchema = new mongoose.Schema(
       {
         miqdor: Number,
 
-        // ✅ YANGI: shu amal vaqtida narx qancha bo‘lgan
-        narx: {
+        // ✅ YANGI: shu amal vaqtida price qancha bo‘lgan
+        price: {
           type: Number,
           default: 0,
           min: 0,
