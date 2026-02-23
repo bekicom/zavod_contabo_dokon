@@ -3,6 +3,15 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
 /* ===================================================
    🌱 Zavoddan filialga mahsulotni RO‘YXATGA QO‘SHISH
    POST /api/global/stock/seed
+   body:
+   {
+     "branch_code": "navoiy",
+     "sent_by": "factory-admin",
+     "items": [
+       { "mahsulot": "Goshtli somsa", "birlik": "dona", "narx": 12000 },
+       { "mahsulot": "Shakar", "birlik": "kg", "narx": 15000 }
+     ]
+   }
 =================================================== */
 exports.seedBranchStock = async (req, res) => {
   try {
@@ -15,13 +24,16 @@ exports.seedBranchStock = async (req, res) => {
       });
     }
 
+    const cleanBranchCode = String(branch_code).trim().toLowerCase();
     const results = [];
 
-    for (const item of items) {
-      const { mahsulot, birlik, narx } = item;
+    for (const raw of items) {
+      const mahsulot = raw?.mahsulot ? String(raw.mahsulot).trim() : "";
       if (!mahsulot) continue;
 
-      const parsedNarx = Number(narx ?? 0);
+      const birlik = raw?.birlik ? String(raw.birlik).trim() : "dona";
+      const parsedNarx = Number(raw?.narx ?? 0);
+
       if (Number.isNaN(parsedNarx) || parsedNarx < 0) {
         return res.status(400).json({
           success: false,
@@ -29,19 +41,18 @@ exports.seedBranchStock = async (req, res) => {
         });
       }
 
+      // MUHIM: konflikt bo‘lmasligi uchun birlik faqat $set ichida
       const doc = await GlobalBranchStock.findOneAndUpdate(
-        { branch_code, mahsulot },
+        { branch_code: cleanBranchCode, mahsulot },
         {
           $setOnInsert: {
-            branch_code,
+            branch_code: cleanBranchCode,
             mahsulot,
-            birlik: birlik || "dona",
             source: "factory",
             miqdor: 0,
           },
-          // mavjud bo'lsa ham narxni yangilaymiz
           $set: {
-            birlik: birlik || "dona",
+            birlik,
             narx: parsedNarx,
           },
           $push: {
@@ -60,27 +71,30 @@ exports.seedBranchStock = async (req, res) => {
       results.push(doc);
     }
 
-    res.json({
+    return res.json({
       success: true,
-      message: "✅ Mahsulotlar filialga ruxsat sifatida qo‘shildi",
+      message: "✅ Mahsulotlar filialga muvaffaqiyatli qo‘shildi/yangilandi",
       count: results.length,
       data: results.map((i) => ({
+        branch_code: i.branch_code,
         mahsulot: i.mahsulot,
         birlik: i.birlik,
+        miqdor: i.miqdor,
         narx: i.narx || 0,
       })),
     });
   } catch (err) {
     console.error("seedBranchStock error:", err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server xatosi",
+      error: err.message,
     });
   }
 };
 
 /* ===================================================
-   📦 Filialga RUXSAT ETILGAN mahsulotlar
+   📦 Filialga ruxsat etilgan mahsulotlar ro‘yxati
    GET /api/global/stock/:branch_code
 =================================================== */
 exports.getBranchStock = async (req, res) => {
@@ -94,25 +108,31 @@ exports.getBranchStock = async (req, res) => {
       });
     }
 
-    const list = await GlobalBranchStock.find({ branch_code })
+    const cleanBranchCode = String(branch_code).trim().toLowerCase();
+
+    const list = await GlobalBranchStock.find({ branch_code: cleanBranchCode })
       .sort({ mahsulot: 1 })
       .lean();
 
-    res.json({
+    return res.json({
       success: true,
-      branch_code,
+      branch_code: cleanBranchCode,
       count: list.length,
       data: list.map((item) => ({
         mahsulot: item.mahsulot,
         birlik: item.birlik,
+        miqdor: item.miqdor,
         narx: item.narx || 0,
+        source: item.source || "factory",
+        updatedAt: item.updatedAt,
       })),
     });
   } catch (err) {
     console.error("getBranchStock error:", err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server xatosi",
+      error: err.message,
     });
   }
 };
