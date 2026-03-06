@@ -6,8 +6,10 @@ const ShopOrder = require("../models/ShopOrder");
 exports.createOrder = async (req, res) => {
   try {
     const { shop_name, items } = req.body;
+    const normalizedShopName =
+      typeof shop_name === "string" ? shop_name.trim().toLowerCase() : "";
 
-    if (!shop_name || !Array.isArray(items) || items.length === 0) {
+    if (!normalizedShopName || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Shop yoki items noto‘g‘ri",
@@ -15,7 +17,7 @@ exports.createOrder = async (req, res) => {
     }
 
     const order = await ShopOrder.create({
-      shop_name,
+      shop_name: normalizedShopName,
       items,
       status: "PENDING",
     });
