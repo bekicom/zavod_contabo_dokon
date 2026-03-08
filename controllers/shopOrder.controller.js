@@ -1,4 +1,5 @@
 const ShopOrder = require("../models/ShopOrder");
+const GlobalBranchStock = require("../models/GlobalBranchStock");
 
 /* =========================
    CREATE ORDER
@@ -51,12 +52,48 @@ exports.getAllOrders = async (req, res) => {
       filter.status = { $ne: "RECEIVED" };
     }
 
-    const orders = await ShopOrder.find(filter).sort({ createdAt: -1 });
+    const orders = await ShopOrder.find(filter).sort({ createdAt: -1 }).lean();
+
+    const branchCodes = [...new Set(orders.map((order) => order.shop_name).filter(Boolean))];
+    const productNames = [
+      ...new Set(
+        orders.flatMap((order) =>
+          (order.items || []).map((item) => item.product_name).filter(Boolean),
+        ),
+      ),
+    ];
+
+    let priceMap = new Map();
+
+    if (branchCodes.length > 0 && productNames.length > 0) {
+      const stockItems = await GlobalBranchStock.find({
+        branch_code: { $in: branchCodes },
+        mahsulot: { $in: productNames },
+      })
+        .select("branch_code mahsulot price")
+        .lean();
+
+      priceMap = new Map(
+        stockItems.map((stock) => [
+          `${stock.branch_code}::${stock.mahsulot}`,
+          Number(stock.price || 0),
+        ]),
+      );
+    }
+
+    const enrichedOrders = orders.map((order) => ({
+      ...order,
+      items: (order.items || []).map((item) => ({
+        ...item,
+        price:
+          priceMap.get(`${order.shop_name}::${item.product_name}`) ?? 0,
+      })),
+    }));
 
     res.json({
       success: true,
-      count: orders.length,
-      data: orders,
+      count: enrichedOrders.length,
+      data: enrichedOrders,
     });
   } catch (error) {
     res.status(500).json({
