@@ -1,6 +1,40 @@
 const ShopOrder = require("../models/ShopOrder");
 const GlobalBranchStock = require("../models/GlobalBranchStock");
 
+const normalizeApprovedItems = (incomingItems, existingItems) => {
+  if (!Array.isArray(incomingItems) || incomingItems.length === 0) {
+    return existingItems;
+  }
+
+  const existingMap = new Map(
+    (existingItems || []).map((item) => [
+      String(item.product_name || "").trim().toLowerCase(),
+      item,
+    ]),
+  );
+
+  return incomingItems.map((rawItem) => {
+    const productName = String(rawItem?.product_name || "").trim();
+    const normalizedName = productName.toLowerCase();
+    const matchedItem = existingMap.get(normalizedName);
+    const soni = Number(rawItem?.soni);
+
+    if (!productName || !matchedItem) {
+      throw new Error(`Mahsulot topilmadi: ${rawItem?.product_name || "noma'lum"}`);
+    }
+
+    if (!Number.isFinite(soni) || soni <= 0) {
+      throw new Error(`Mahsulot soni noto'g'ri: ${productName}`);
+    }
+
+    return {
+      product_name: matchedItem.product_name,
+      soni,
+      unit: rawItem?.unit || matchedItem.unit || "dona",
+    };
+  });
+};
+
 /* =========================
    CREATE ORDER
 ========================= */
@@ -148,6 +182,10 @@ exports.approveOrder = async (req, res) => {
         success: false,
         message: "Bu order allaqachon ko‘rilgan",
       });
+    }
+
+    if (req.body?.items) {
+      order.items = normalizeApprovedItems(req.body.items, order.items);
     }
 
     order.status = "APPROVED";
