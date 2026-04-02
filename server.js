@@ -40,7 +40,7 @@ app.use("/api/global", globalStockRoutes);
 
 /* =========================
    TEST ROUTE
-========================= */
+========================sasas= */
 app.get("/", (req, res) => {
   res.json({
     success: true,
