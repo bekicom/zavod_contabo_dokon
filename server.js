@@ -35,9 +35,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-/* =========================
-   ROUTES
-========================= */
+
 app.use("/api/global", globalStockRoutes);
 
 /* =========================
