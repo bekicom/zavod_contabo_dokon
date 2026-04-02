@@ -7,9 +7,7 @@ const globalStockRoutes = require("./routes/globalStockRoutes");
 
 const app = express();
 
-/* =========================
-   MIDDLEWARE
-========================= */
+
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
