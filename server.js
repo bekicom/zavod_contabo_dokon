@@ -39,7 +39,7 @@ app.use(async (req, res, next) => {
 app.use("/api/global", globalStockRoutes);
 
 /* =========================
-   TEST ROUTEыфыфы
+   TEST ROUTEыфыфыsasasa
 ========================sasas= */
 app.get("/", (req, res) => {
   res.json({
