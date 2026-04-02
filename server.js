@@ -13,9 +13,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-/* =========================
-   DB CONNECT (SAFE FOR VERCEL)
-========================= */
+
 let isConnected = false;
 
 async function ensureDB() {
