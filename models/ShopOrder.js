@@ -9,10 +9,24 @@ const OrderItemSchema = new mongoose.Schema(
     },
 
     soni: {
-      // 🔥 qty o‘rniga soni
+      // so‘ralgan jami son
       type: Number,
       required: true,
       min: 1,
+    },
+
+    approved_soni: {
+      // zavod tomonidan jami tasdiqlab yuborilgan son
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    pending_soni: {
+      // hali yuborilmagan (backorder) son
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     unit: {
@@ -58,7 +72,7 @@ const ShopOrderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED", "RECEIVED"],
+      enum: ["PENDING", "PARTIAL", "APPROVED", "REJECTED", "RECEIVED"],
       default: "PENDING",
     },
 
