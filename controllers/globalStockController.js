@@ -971,6 +971,145 @@ exports.deleteBranchStockProduct = async (req, res) => {
 };
 
 /* ===================================================
+   ✏️ Filial omboridagi mahsulotni tahrirlash
+   PUT /api/global/stock/:branch_code/products/:product_id
+=================================================== */
+exports.updateBranchStockProduct = async (req, res) => {
+  try {
+    const branchCode = normalizeKey(req.params?.branch_code);
+    const productId = normalizeText(req.params?.product_id);
+
+    if (!branchCode || !productId) {
+      return res.status(400).json({
+        success: false,
+        message: "branch_code va product_id majburiy",
+      });
+    }
+
+    const payload = {};
+
+    if (req.body?.mahsulot !== undefined || req.body?.name !== undefined) {
+      const newName = normalizeText(req.body?.mahsulot ?? req.body?.name);
+      if (!newName) {
+        return res.status(400).json({
+          success: false,
+          message: "mahsulot bo'sh bo'lmasligi kerak",
+        });
+      }
+      payload.mahsulot = newName;
+    }
+
+    if (req.body?.birlik !== undefined) {
+      const birlik = normalizeText(req.body?.birlik);
+      if (!ALLOWED_UNITS.has(birlik)) {
+        return res.status(400).json({
+          success: false,
+          message: "birlik noto‘g‘ri qiymat",
+        });
+      }
+      payload.birlik = birlik;
+    }
+
+    if (req.body?.price !== undefined) {
+      const price = Number(req.body.price);
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "price 0 yoki undan katta son bo‘lishi kerak",
+        });
+      }
+      payload.price = price;
+    }
+
+    if (req.body?.category !== undefined || req.body?.subcategory !== undefined) {
+      const category = normalizeText(req.body?.category);
+      const subcategory = normalizeText(req.body?.subcategory);
+
+      if (!category || !subcategory) {
+        return res.status(400).json({
+          success: false,
+          message: "category va subcategory birga yuborilishi kerak",
+        });
+      }
+
+      const categoryDoc = await FactoryCategory.findOne({
+        category_key: normalizeKey(category),
+      }).lean();
+
+      if (!categoryDoc) {
+        return res.status(400).json({
+          success: false,
+          message: `"${category}" kategoriyasi topilmadi`,
+        });
+      }
+
+      const subcategoryValue =
+        (categoryDoc.subcategories || []).find(
+          (s) => normalizeKey(s) === normalizeKey(subcategory),
+        ) || null;
+
+      if (!subcategoryValue) {
+        return res.status(400).json({
+          success: false,
+          message: `"${subcategory}" subkategoriya "${categoryDoc.category}" ichida topilmadi`,
+        });
+      }
+
+      payload.category = categoryDoc.category;
+      payload.subcategory = subcategoryValue;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Tahrirlash uchun kamida bitta maydon yuboring",
+      });
+    }
+
+    const updated = await GlobalBranchStock.findOneAndUpdate(
+      { _id: productId, branch_code: branchCode },
+      { $set: payload },
+      { new: true, runValidators: true },
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: "Yangilash uchun mahsulot topilmadi",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Mahsulot yangilandi ✅",
+      data: {
+        _id: updated._id,
+        branch_code: updated.branch_code,
+        mahsulot: updated.mahsulot,
+        category: updated.category || "",
+        subcategory: updated.subcategory || "",
+        birlik: updated.birlik,
+        price: Number(updated.price || 0),
+      },
+    });
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Bu nomdagi mahsulot ushbu filialda allaqachon mavjud",
+      });
+    }
+
+    console.error("updateBranchStockProduct error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
    🔄 Zavod queue sync (price/birlik update)
 =================================================== */
 exports.syncGlobalProduct = async (req, res) => {

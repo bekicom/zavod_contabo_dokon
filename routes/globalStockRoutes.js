@@ -45,6 +45,10 @@ router.post("/stock/seed", globalStockCtrl.seedBranchStock);
 
 // 📦 Filial → Global (o‘z omborini ko‘rish)
 router.get("/stock/:branch_code", globalStockCtrl.getBranchStock);
+router.put(
+  "/stock/:branch_code/products/:product_id",
+  globalStockCtrl.updateBranchStockProduct,
+);
 router.delete(
   "/stock/:branch_code/products/:product_id",
   globalStockCtrl.deleteBranchStockProduct,
