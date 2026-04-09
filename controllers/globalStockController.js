@@ -391,6 +391,53 @@ exports.getFactoryCatalog = async (req, res) => {
 };
 
 /* ===================================================
+   🔎 Kategoriya/Subkategoriya bo‘yicha zavod katalogi
+   GET /api/global/factory/catalog/category/:category/subcategory/:subcategory
+=================================================== */
+exports.getFactoryCatalogBySubcategory = async (req, res) => {
+  try {
+    const category = normalizeText(req.params?.category);
+    const subcategory = normalizeText(req.params?.subcategory);
+
+    if (!category || !subcategory) {
+      return res.status(400).json({
+        success: false,
+        message: "category va subcategory majburiy",
+      });
+    }
+
+    const list = await FactoryCatalogProduct.find({
+      category_key: normalizeKey(category),
+      subcategory_key: normalizeKey(subcategory),
+    })
+      .sort({ mahsulot: 1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      category,
+      subcategory,
+      count: list.length,
+      data: list.map((item) => ({
+        _id: item._id,
+        mahsulot: item.mahsulot,
+        birlik: item.birlik,
+        price: Number(item.price || 0),
+        category: item.category,
+        subcategory: item.subcategory,
+      })),
+    });
+  } catch (err) {
+    console.error("getFactoryCatalogBySubcategory error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
    🌱 Zavod katalogidan filialga mahsulot yuborish
    POST /api/global/stock/seed
 =================================================== */

@@ -22,6 +22,10 @@ router.get("/factory/categories", globalStockCtrl.getFactoryCategories);
 router.post("/factory/products", globalStockCtrl.createFactoryProduct);
 router.post("/factory/products/bulk", globalStockCtrl.createFactoryProductsBulk);
 router.get("/factory/catalog", globalStockCtrl.getFactoryCatalog);
+router.get(
+  "/factory/catalog/category/:category/subcategory/:subcategory",
+  globalStockCtrl.getFactoryCatalogBySubcategory,
+);
 
 // 🌱 Zavod → Global (filial omborini seed qilish)
 router.post("/stock/seed", globalStockCtrl.seedBranchStock);
