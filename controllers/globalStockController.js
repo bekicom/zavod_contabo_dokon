@@ -1,4 +1,5 @@
 const GlobalBranchStock = require("../models/GlobalBranchStock");
+const ALLOWED_UNITS = new Set(["kg", "dona", "pachka", "blok"]);
 
 /* ===================================================
    🌱 Zavoddan filialga mahsulotni RO‘YXATGA QO‘SHISH
@@ -129,6 +130,135 @@ exports.getBranchStock = async (req, res) => {
     });
   } catch (err) {
     console.error("getBranchStock error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
+   🔄 Zavod queue sync (price/birlik update)
+   POST /api/global-products/sync
+   body:
+   {
+     "name": "Shakar",
+     "price": 17000,
+     "birlik": "kg",
+     "branch_code": "navoiy" // optional
+   }
+=================================================== */
+exports.syncGlobalProduct = async (req, res) => {
+  try {
+    const rawName = req.body?.name ?? req.body?.mahsulot;
+    const name = typeof rawName === "string" ? rawName.trim() : "";
+    const rawPrice = req.body?.price;
+    const birlik =
+      typeof req.body?.birlik === "string" ? req.body.birlik.trim() : "";
+    const rawBranchCode =
+      typeof req.body?.branch_code === "string"
+        ? req.body.branch_code.trim().toLowerCase()
+        : "";
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "name (yoki mahsulot) majburiy",
+      });
+    }
+
+    if (rawPrice === undefined || rawPrice === null || rawPrice === "") {
+      return res.status(400).json({
+        success: false,
+        message: "price majburiy",
+      });
+    }
+
+    const parsedPrice = Number(rawPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "price 0 yoki undan katta son bo‘lishi kerak",
+      });
+    }
+
+    if (birlik && !ALLOWED_UNITS.has(birlik)) {
+      return res.status(400).json({
+        success: false,
+        message: "birlik noto‘g‘ri qiymat",
+      });
+    }
+
+    const now = new Date();
+    const update = {
+      $set: {
+        price: parsedPrice,
+        ...(birlik ? { birlik } : {}),
+      },
+      $push: {
+        tarix: {
+          miqdor: 0,
+          price: parsedPrice,
+          amal: "seed",
+          izoh: "factory-sync",
+          sana: now,
+        },
+      },
+    };
+
+    if (rawBranchCode) {
+      const updated = await GlobalBranchStock.findOneAndUpdate(
+        { branch_code: rawBranchCode, mahsulot: name },
+        update,
+        { new: true },
+      );
+
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          message: "Berilgan branch_code uchun mahsulot topilmadi",
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: "Mahsulot narxi filial bo‘yicha yangilandi",
+        data: {
+          branch_code: updated.branch_code,
+          mahsulot: updated.mahsulot,
+          birlik: updated.birlik,
+          price: Number(updated.price || 0),
+          updatedAt: updated.updatedAt,
+        },
+      });
+    }
+
+    const updateResult = await GlobalBranchStock.updateMany(
+      { mahsulot: name },
+      update,
+    );
+
+    if (!updateResult.modifiedCount) {
+      return res.status(404).json({
+        success: false,
+        message: "Yangilash uchun mahsulot topilmadi",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Mahsulot narxi barcha filiallarda yangilandi",
+      data: {
+        mahsulot: name,
+        updated_count: updateResult.modifiedCount,
+        matched_count: updateResult.matchedCount,
+        price: parsedPrice,
+        birlik: birlik || null,
+      },
+    });
+  } catch (err) {
+    console.error("syncGlobalProduct error:", err);
     return res.status(500).json({
       success: false,
       message: "Server xatosi",

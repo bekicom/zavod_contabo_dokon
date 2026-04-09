@@ -37,6 +37,7 @@ app.use(async (req, res, next) => {
 
 
 app.use("/api/global", globalStockRoutes);
+app.use("/api/global-products", globalStockRoutes);
 
 /* =========================
    TEST ROUTEыфыфыsasasa

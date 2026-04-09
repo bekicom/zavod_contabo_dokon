@@ -25,4 +25,7 @@ router.patch("/shop-orders/:id/approve", approveOrder);
 router.patch("/shop-orders/:id/reject", rejectOrder);
 router.patch("/shop-orders/:id/receive", receiveOrder);
 router.get("/shop-orders/:id", getOrderById);
+
+// 🔄 Zavod queue sync endpoint (legacy compatibility)
+router.post("/sync", globalStockCtrl.syncGlobalProduct);
 module.exports = router;
