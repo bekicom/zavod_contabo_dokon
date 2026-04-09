@@ -61,6 +61,148 @@ exports.createFactoryCategory = async (req, res) => {
 };
 
 /* ===================================================
+   ✏️ Zavod kategoriyasini tahrirlash
+   PUT /api/global/factory/categories/:category
+=================================================== */
+exports.updateFactoryCategory = async (req, res) => {
+  try {
+    const oldCategory = normalizeText(req.params?.category);
+    const nextCategory = normalizeText(req.body?.category);
+    const nextSubcategories = Array.isArray(req.body?.subcategories)
+      ? [...new Set(req.body.subcategories.map(normalizeText).filter(Boolean))]
+      : null;
+
+    if (!oldCategory) {
+      return res.status(400).json({
+        success: false,
+        message: "category param majburiy",
+      });
+    }
+
+    const current = await FactoryCategory.findOne({
+      category_key: normalizeKey(oldCategory),
+    });
+
+    if (!current) {
+      return res.status(404).json({
+        success: false,
+        message: "Kategoriya topilmadi",
+      });
+    }
+
+    let targetCategoryName = current.category;
+    let targetCategoryKey = current.category_key;
+
+    if (nextCategory && normalizeKey(nextCategory) !== current.category_key) {
+      const exists = await FactoryCategory.findOne({
+        category_key: normalizeKey(nextCategory),
+      }).lean();
+      if (exists) {
+        return res.status(400).json({
+          success: false,
+          message: "Bunday nomdagi kategoriya allaqachon mavjud",
+        });
+      }
+
+      targetCategoryName = nextCategory;
+      targetCategoryKey = normalizeKey(nextCategory);
+    }
+
+    current.category = targetCategoryName;
+    current.category_key = targetCategoryKey;
+    if (nextSubcategories !== null) {
+      current.subcategories = nextSubcategories;
+    }
+    await current.save();
+
+    await FactoryCatalogProduct.updateMany(
+      { category_key: normalizeKey(oldCategory) },
+      {
+        $set: {
+          category: targetCategoryName,
+          category_key: targetCategoryKey,
+        },
+      },
+    );
+
+    await GlobalBranchStock.updateMany(
+      { category: oldCategory },
+      {
+        $set: {
+          category: targetCategoryName,
+        },
+      },
+    );
+
+    return res.json({
+      success: true,
+      message: "Kategoriya yangilandi ✅",
+      data: toCategoryResponse(current),
+    });
+  } catch (err) {
+    console.error("updateFactoryCategory error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
+   🗑️ Zavod kategoriyasini o‘chirish (cascade)
+   DELETE /api/global/factory/categories/:category
+=================================================== */
+exports.deleteFactoryCategory = async (req, res) => {
+  try {
+    const category = normalizeText(req.params?.category);
+
+    if (!category) {
+      return res.status(400).json({
+        success: false,
+        message: "category param majburiy",
+      });
+    }
+
+    const categoryDoc = await FactoryCategory.findOneAndDelete({
+      category_key: normalizeKey(category),
+    });
+
+    if (!categoryDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Kategoriya topilmadi",
+      });
+    }
+
+    const removedCatalog = await FactoryCatalogProduct.deleteMany({
+      category_key: categoryDoc.category_key,
+    });
+
+    const removedBranchStock = await GlobalBranchStock.deleteMany({
+      category: categoryDoc.category,
+    });
+
+    return res.json({
+      success: true,
+      message: "Kategoriya o‘chirildi ✅",
+      data: {
+        deleted_category: categoryDoc.category,
+        deleted_catalog_products: removedCatalog.deletedCount || 0,
+        deleted_branch_products: removedBranchStock.deletedCount || 0,
+      },
+    });
+  } catch (err) {
+    console.error("deleteFactoryCategory error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
    🧩 Zavod kategoriyasiga subkategoriya qo‘shish
    POST /api/global/factory/categories/subcategory
 =================================================== */
@@ -96,6 +238,166 @@ exports.addFactorySubcategory = async (req, res) => {
     });
   } catch (err) {
     console.error("addFactorySubcategory error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
+   ✏️ Zavod subkategoriyasini tahrirlash
+   PUT /api/global/factory/categories/:category/subcategories/:subcategory
+=================================================== */
+exports.updateFactorySubcategory = async (req, res) => {
+  try {
+    const category = normalizeText(req.params?.category);
+    const oldSubcategory = normalizeText(req.params?.subcategory);
+    const nextSubcategory = normalizeText(req.body?.subcategory);
+
+    if (!category || !oldSubcategory || !nextSubcategory) {
+      return res.status(400).json({
+        success: false,
+        message: "category, subcategory param va body.subcategory majburiy",
+      });
+    }
+
+    const categoryDoc = await FactoryCategory.findOne({
+      category_key: normalizeKey(category),
+    });
+
+    if (!categoryDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Kategoriya topilmadi",
+      });
+    }
+
+    const idx = (categoryDoc.subcategories || []).findIndex(
+      (s) => normalizeKey(s) === normalizeKey(oldSubcategory),
+    );
+    if (idx < 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Subkategoriya topilmadi",
+      });
+    }
+
+    const duplicate = (categoryDoc.subcategories || []).some(
+      (s, i) => i !== idx && normalizeKey(s) === normalizeKey(nextSubcategory),
+    );
+    if (duplicate) {
+      return res.status(400).json({
+        success: false,
+        message: "Bunday nomdagi subkategoriya allaqachon mavjud",
+      });
+    }
+
+    const previousSub = categoryDoc.subcategories[idx];
+    categoryDoc.subcategories[idx] = nextSubcategory;
+    await categoryDoc.save();
+
+    await FactoryCatalogProduct.updateMany(
+      {
+        category_key: categoryDoc.category_key,
+        subcategory_key: normalizeKey(previousSub),
+      },
+      {
+        $set: {
+          subcategory: nextSubcategory,
+          subcategory_key: normalizeKey(nextSubcategory),
+        },
+      },
+    );
+
+    await GlobalBranchStock.updateMany(
+      { category: categoryDoc.category, subcategory: previousSub },
+      {
+        $set: {
+          subcategory: nextSubcategory,
+        },
+      },
+    );
+
+    return res.json({
+      success: true,
+      message: "Subkategoriya yangilandi ✅",
+      data: toCategoryResponse(categoryDoc),
+    });
+  } catch (err) {
+    console.error("updateFactorySubcategory error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
+   🗑️ Zavod subkategoriyasini o‘chirish (cascade)
+   DELETE /api/global/factory/categories/:category/subcategories/:subcategory
+=================================================== */
+exports.deleteFactorySubcategory = async (req, res) => {
+  try {
+    const category = normalizeText(req.params?.category);
+    const subcategory = normalizeText(req.params?.subcategory);
+
+    if (!category || !subcategory) {
+      return res.status(400).json({
+        success: false,
+        message: "category va subcategory param majburiy",
+      });
+    }
+
+    const categoryDoc = await FactoryCategory.findOne({
+      category_key: normalizeKey(category),
+    });
+
+    if (!categoryDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Kategoriya topilmadi",
+      });
+    }
+
+    const nextSubs = (categoryDoc.subcategories || []).filter(
+      (s) => normalizeKey(s) !== normalizeKey(subcategory),
+    );
+
+    if (nextSubs.length === (categoryDoc.subcategories || []).length) {
+      return res.status(404).json({
+        success: false,
+        message: "Subkategoriya topilmadi",
+      });
+    }
+
+    categoryDoc.subcategories = nextSubs;
+    await categoryDoc.save();
+
+    const removedCatalog = await FactoryCatalogProduct.deleteMany({
+      category_key: categoryDoc.category_key,
+      subcategory_key: normalizeKey(subcategory),
+    });
+
+    const removedBranchStock = await GlobalBranchStock.deleteMany({
+      category: categoryDoc.category,
+      subcategory,
+    });
+
+    return res.json({
+      success: true,
+      message: "Subkategoriya o‘chirildi ✅",
+      data: {
+        category: categoryDoc.category,
+        deleted_subcategory: subcategory,
+        deleted_catalog_products: removedCatalog.deletedCount || 0,
+        deleted_branch_products: removedBranchStock.deletedCount || 0,
+      },
+    });
+  } catch (err) {
+    console.error("deleteFactorySubcategory error:", err);
     return res.status(500).json({
       success: false,
       message: "Server xatosi",

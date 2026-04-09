@@ -14,9 +14,22 @@ const {
 
 // 🏭 Factory catalog management (global)
 router.post("/factory/categories", globalStockCtrl.createFactoryCategory);
+router.put("/factory/categories/:category", globalStockCtrl.updateFactoryCategory);
+router.delete(
+  "/factory/categories/:category",
+  globalStockCtrl.deleteFactoryCategory,
+);
 router.post(
   "/factory/categories/subcategory",
   globalStockCtrl.addFactorySubcategory,
+);
+router.put(
+  "/factory/categories/:category/subcategories/:subcategory",
+  globalStockCtrl.updateFactorySubcategory,
+);
+router.delete(
+  "/factory/categories/:category/subcategories/:subcategory",
+  globalStockCtrl.deleteFactorySubcategory,
 );
 router.get("/factory/categories", globalStockCtrl.getFactoryCategories);
 router.post("/factory/products", globalStockCtrl.createFactoryProduct);
