@@ -1,6 +1,7 @@
 const GlobalBranchStock = require("../models/GlobalBranchStock");
 const FactoryCategory = require("../models/FactoryCategory");
 const FactoryCatalogProduct = require("../models/FactoryCatalogProduct");
+const mongoose = require("mongoose");
 
 const ALLOWED_UNITS = new Set(["kg", "dona", "pachka", "blok"]);
 
@@ -937,6 +938,13 @@ exports.deleteBranchStockProduct = async (req, res) => {
       });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: "product_id noto‘g‘ri formatda",
+      });
+    }
+
     const deleted = await GlobalBranchStock.findOneAndDelete({
       _id: productId,
       branch_code: branchCode,
@@ -983,6 +991,13 @@ exports.updateBranchStockProduct = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "branch_code va product_id majburiy",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: "product_id noto‘g‘ri formatda",
       });
     }
 
