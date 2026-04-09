@@ -3,6 +3,40 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
 
 const normalizeName = (value) => String(value || "").trim().toLowerCase();
 
+const normalizeItemForClient = (item, price = 0) => {
+  const requestedQty = Number(item?.soni || 0);
+  const approvedQty = Number(item?.approved_soni || 0);
+  const pendingQtyRaw =
+    item?.pending_soni !== undefined && item?.pending_soni !== null
+      ? Number(item.pending_soni)
+      : requestedQty - approvedQty;
+  const pendingQty = Math.max(Number(pendingQtyRaw || 0), 0);
+
+  return {
+    ...item,
+    requested_soni: requestedQty,
+    soni: pendingQty, // clientda "soni" doim qolgan miqdorni bildiradi
+    approved_soni: approvedQty,
+    pending_soni: pendingQty,
+    price: Number(price || 0),
+  };
+};
+
+const normalizeOrderForClient = (order, priceMap = null) => {
+  const safeOrder = order && typeof order.toObject === "function"
+    ? order.toObject()
+    : { ...order };
+
+  return {
+    ...safeOrder,
+    items: (safeOrder.items || []).map((item) => {
+      const key = `${safeOrder.shop_name}::${item.product_name}`;
+      const price = priceMap ? priceMap.get(key) ?? 0 : item.price || 0;
+      return normalizeItemForClient(item, price);
+    }),
+  };
+};
+
 const buildInitialOrderItems = (items) => {
   return (items || []).map((rawItem) => {
     const product_name = String(rawItem?.product_name || "").trim();
@@ -167,14 +201,9 @@ exports.getAllOrders = async (req, res) => {
       );
     }
 
-    const enrichedOrders = orders.map((order) => ({
-      ...order,
-      items: (order.items || []).map((item) => ({
-        ...item,
-        price:
-          priceMap.get(`${order.shop_name}::${item.product_name}`) ?? 0,
-      })),
-    }));
+    const enrichedOrders = orders.map((order) =>
+      normalizeOrderForClient(order, priceMap),
+    );
 
     res.json({
       success: true,
@@ -205,7 +234,7 @@ exports.getOrderById = async (req, res) => {
 
     res.json({
       success: true,
-      data: order,
+      data: normalizeOrderForClient(order),
     });
   } catch (error) {
     res.status(500).json({
@@ -267,7 +296,7 @@ exports.approveOrder = async (req, res) => {
         : approvedInThisRound > 0
           ? "Order qisman tasdiqlandi, qolgan mahsulotlar kutilyapti"
           : "Order backorder holatda qoldi (hozircha jo'natish 0)",
-      data: order,
+      data: normalizeOrderForClient(order),
     });
   } catch (error) {
     res.status(500).json({
