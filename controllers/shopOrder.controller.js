@@ -252,24 +252,21 @@ exports.approveOrder = async (req, res) => {
       order.items,
     );
 
-    if (approvedInThisRound <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Tasdiqlash uchun kamida bitta mahsulot soni 0 dan katta bo'lishi kerak",
-      });
-    }
-
     order.items = nextItems;
     const stillPending = nextItems.some((item) => Number(item.pending_soni || 0) > 0);
     order.status = stillPending ? "PARTIAL" : "APPROVED";
-    order.approved_at = new Date();
+    if (approvedInThisRound > 0 || !stillPending) {
+      order.approved_at = new Date();
+    }
     await order.save();
 
     res.json({
       success: true,
-      message: stillPending
-        ? "Order qisman tasdiqlandi, qolgan mahsulotlar kutilyapti"
-        : "Order to'liq tasdiqlandi",
+      message: !stillPending
+        ? "Order to'liq tasdiqlandi"
+        : approvedInThisRound > 0
+          ? "Order qisman tasdiqlandi, qolgan mahsulotlar kutilyapti"
+          : "Order backorder holatda qoldi (hozircha jo'natish 0)",
       data: order,
     });
   } catch (error) {
