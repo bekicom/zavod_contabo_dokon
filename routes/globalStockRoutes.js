@@ -12,11 +12,26 @@ const {
   getOrderById,
 } = require("../controllers/shopOrder.controller");
 
+// 🏭 Factory catalog management (global)
+router.post("/factory/categories", globalStockCtrl.createFactoryCategory);
+router.post(
+  "/factory/categories/subcategory",
+  globalStockCtrl.addFactorySubcategory,
+);
+router.get("/factory/categories", globalStockCtrl.getFactoryCategories);
+router.post("/factory/products", globalStockCtrl.createFactoryProduct);
+router.post("/factory/products/bulk", globalStockCtrl.createFactoryProductsBulk);
+router.get("/factory/catalog", globalStockCtrl.getFactoryCatalog);
+
 // 🌱 Zavod → Global (filial omborini seed qilish)
 router.post("/stock/seed", globalStockCtrl.seedBranchStock);
 
 // 📦 Filial → Global (o‘z omborini ko‘rish)
 router.get("/stock/:branch_code", globalStockCtrl.getBranchStock);
+router.delete(
+  "/stock/:branch_code/products/:product_id",
+  globalStockCtrl.deleteBranchStockProduct,
+);
 
 // 🧾 Shop Orders
 router.post("/shop-orders", createOrder);
