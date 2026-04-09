@@ -133,6 +133,10 @@ exports.getFactoryCategories = async (req, res) => {
 =================================================== */
 exports.createFactoryProduct = async (req, res) => {
   try {
+    if (Array.isArray(req.body?.items)) {
+      return exports.createFactoryProductsBulk(req, res);
+    }
+
     const productName = normalizeText(req.body?.mahsulot ?? req.body?.name);
     const category = normalizeText(req.body?.category);
     const subcategory = normalizeText(req.body?.subcategory);
