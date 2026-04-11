@@ -3,7 +3,8 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
 
 const normalizeName = (value) => String(value || "").trim().toLowerCase();
 
-const normalizeItemForClient = (item, price = 0) => {
+const normalizeItemForClient = (item, meta = {}) => {
+  const price = Number(meta?.price ?? item?.price ?? 0);
   const requestedQty = Number(item?.soni || 0);
   const approvedQty = Number(item?.approved_soni || 0);
   const pendingQtyRaw =
@@ -18,11 +19,16 @@ const normalizeItemForClient = (item, price = 0) => {
     soni: pendingQty, // clientda "soni" doim qolgan miqdorni bildiradi
     approved_soni: approvedQty,
     pending_soni: pendingQty,
-    price: Number(price || 0),
+    price,
+    category_name: String(
+      item?.category_name || item?.category_title || meta?.category_name || "",
+    ).trim(),
+    subcategory: String(item?.subcategory || meta?.subcategory || "").trim(),
+    category: String(item?.category || meta?.category || "").trim(),
   };
 };
 
-const normalizeOrderForClient = (order, priceMap = null) => {
+const normalizeOrderForClient = (order, itemMetaMap = null) => {
   const safeOrder = order && typeof order.toObject === "function"
     ? order.toObject()
     : { ...order };
@@ -31,8 +37,20 @@ const normalizeOrderForClient = (order, priceMap = null) => {
     ...safeOrder,
     items: (safeOrder.items || []).map((item) => {
       const key = `${safeOrder.shop_name}::${item.product_name}`;
-      const price = priceMap ? priceMap.get(key) ?? 0 : item.price || 0;
-      return normalizeItemForClient(item, price);
+      const meta = itemMetaMap
+        ? (itemMetaMap.get(key) || {
+            price: item.price || 0,
+            category_name: item.category_name || "",
+            subcategory: item.subcategory || "",
+            category: item.category || "",
+          })
+        : {
+            price: item.price || 0,
+            category_name: item.category_name || "",
+            subcategory: item.subcategory || "",
+            category: item.category || "",
+          };
+      return normalizeItemForClient(item, meta);
     }),
   };
 };
@@ -41,6 +59,11 @@ const buildInitialOrderItems = (items) => {
   return (items || []).map((rawItem) => {
     const product_name = String(rawItem?.product_name || "").trim();
     const soni = Number(rawItem?.soni);
+    const category_name = String(
+      rawItem?.category_name || rawItem?.category_title || "",
+    ).trim();
+    const subcategory = String(rawItem?.subcategory || "").trim();
+    const category = String(rawItem?.category || "").trim();
 
     if (!product_name) {
       throw new Error("Mahsulot nomi bo'sh bo'lishi mumkin emas");
@@ -56,6 +79,9 @@ const buildInitialOrderItems = (items) => {
       approved_soni: 0,
       pending_soni: soni,
       unit: rawItem?.unit || "dona",
+      category_name,
+      subcategory,
+      category,
     };
   });
 };
@@ -110,6 +136,17 @@ const normalizeApprovedItems = (incomingItems, existingItems) => {
       approved_soni: nextApproved,
       pending_soni: nextPending,
       unit: incoming?.unit || existingItem.unit || "dona",
+      category_name:
+        String(
+          incoming?.category_name ||
+            incoming?.category_title ||
+            existingItem.category_name ||
+            "",
+        ).trim(),
+      subcategory: String(
+        incoming?.subcategory || existingItem.subcategory || "",
+      ).trim(),
+      category: String(incoming?.category || existingItem.category || "").trim(),
     };
   });
 
@@ -183,26 +220,31 @@ exports.getAllOrders = async (req, res) => {
       ),
     ];
 
-    let priceMap = new Map();
+    let itemMetaMap = new Map();
 
     if (branchCodes.length > 0 && productNames.length > 0) {
       const stockItems = await GlobalBranchStock.find({
         branch_code: { $in: branchCodes },
         mahsulot: { $in: productNames },
       })
-        .select("branch_code mahsulot price")
+        .select("branch_code mahsulot price category subcategory")
         .lean();
 
-      priceMap = new Map(
+      itemMetaMap = new Map(
         stockItems.map((stock) => [
           `${stock.branch_code}::${stock.mahsulot}`,
-          Number(stock.price || 0),
+          {
+            price: Number(stock.price || 0),
+            category_name: String(stock.category || "").trim(),
+            subcategory: String(stock.subcategory || "").trim(),
+            category: String(stock.category || "").trim(),
+          },
         ]),
       );
     }
 
     const enrichedOrders = orders.map((order) =>
-      normalizeOrderForClient(order, priceMap),
+      normalizeOrderForClient(order, itemMetaMap),
     );
 
     res.json({

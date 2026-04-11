@@ -52,6 +52,24 @@ const OrderItemSchema = new mongoose.Schema(
       ],
       default: "dona",
     },
+
+    category_name: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    subcategory: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    category: {
+      type: String,
+      trim: true,
+      default: "",
+    },
   },
   { _id: false },
 );
