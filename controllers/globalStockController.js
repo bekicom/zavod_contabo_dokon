@@ -654,6 +654,55 @@ exports.createFactoryProductsBulk = async (req, res) => {
 };
 
 /* ===================================================
+   🗑️ Zavod katalogidan bitta mahsulotni o‘chirish
+   DELETE /api/global/factory/products/:product
+=================================================== */
+exports.deleteFactoryProduct = async (req, res) => {
+  try {
+    const product = normalizeText(req.params?.product);
+
+    if (!product) {
+      return res.status(400).json({
+        success: false,
+        message: "product param majburiy",
+      });
+    }
+
+    const productKey = normalizeKey(product);
+    const deletedProduct = await FactoryCatalogProduct.findOneAndDelete({
+      product_key: productKey,
+    });
+
+    if (!deletedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Mahsulot topilmadi",
+      });
+    }
+
+    const removedBranchStock = await GlobalBranchStock.deleteMany({
+      mahsulot: deletedProduct.mahsulot,
+    });
+
+    return res.json({
+      success: true,
+      message: "Mahsulot o‘chirildi ✅",
+      data: {
+        deleted_product: deletedProduct.mahsulot,
+        deleted_branch_products: removedBranchStock.deletedCount || 0,
+      },
+    });
+  } catch (err) {
+    console.error("deleteFactoryProduct error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
    🗂️ Zavod katalogi (grouped)
    GET /api/global/factory/catalog
 =================================================== */
@@ -924,6 +973,78 @@ exports.getBranchStock = async (req, res) => {
 };
 
 /* ===================================================
+   📚 Barcha filiallar bo‘yicha ombor ro‘yxati
+   GET /api/global/stocks
+=================================================== */
+exports.getAllBranchStocks = async (req, res) => {
+  try {
+    const list = await GlobalBranchStock.find({})
+      .sort({ branch_code: 1, category: 1, subcategory: 1, mahsulot: 1 })
+      .lean();
+
+    const branches = {};
+
+    for (const item of list) {
+      const branchCode = item.branch_code || "unknown";
+      const category = item.category || "Boshqa";
+      const subcategory = item.subcategory || "Boshqa";
+
+      if (!branches[branchCode]) {
+        branches[branchCode] = {
+          branch_code: branchCode,
+          count: 0,
+          grouped: {},
+          data: [],
+        };
+      }
+
+      branches[branchCode].count += 1;
+      branches[branchCode].data.push({
+        _id: item._id,
+        mahsulot: item.mahsulot,
+        category,
+        subcategory,
+        birlik: item.birlik,
+        miqdor: item.miqdor,
+        price: item.price || 0,
+        source: item.source || "factory",
+        updatedAt: item.updatedAt,
+      });
+
+      if (!branches[branchCode].grouped[category]) {
+        branches[branchCode].grouped[category] = {};
+      }
+      if (!branches[branchCode].grouped[category][subcategory]) {
+        branches[branchCode].grouped[category][subcategory] = [];
+      }
+      branches[branchCode].grouped[category][subcategory].push({
+        _id: item._id,
+        mahsulot: item.mahsulot,
+        birlik: item.birlik,
+        miqdor: item.miqdor,
+        price: item.price || 0,
+        source: item.source || "factory",
+        updatedAt: item.updatedAt,
+      });
+    }
+
+    return res.json({
+      success: true,
+      count: list.length,
+      branch_count: Object.keys(branches).length,
+      branches: Object.values(branches),
+    });
+  } catch (err) {
+    console.error("getAllBranchStocks error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
    🗑️ Filial omboridan mahsulotni o‘chirish
 =================================================== */
 exports.deleteBranchStockProduct = async (req, res) => {
@@ -970,6 +1091,67 @@ exports.deleteBranchStockProduct = async (req, res) => {
     });
   } catch (err) {
     console.error("deleteBranchStockProduct error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server xatosi",
+      error: err.message,
+    });
+  }
+};
+
+/* ===================================================
+   🗑️ Filial omboridan mahsulotni nom bo‘yicha o‘chirish
+   DELETE /api/global/stock/:branch_code/products/by-name
+=================================================== */
+exports.deleteBranchStockProductByName = async (req, res) => {
+  try {
+    const branchCode = normalizeKey(req.params?.branch_code);
+    const productName = normalizeText(req.body?.mahsulot ?? req.body?.name);
+    const category = normalizeText(req.body?.category);
+    const subcategory = normalizeText(req.body?.subcategory);
+
+    if (!branchCode || !productName) {
+      return res.status(400).json({
+        success: false,
+        message: "branch_code va mahsulot (yoki name) majburiy",
+      });
+    }
+
+    const filter = {
+      branch_code: branchCode,
+      mahsulot: productName,
+    };
+
+    if (category) {
+      filter.category = category;
+    }
+
+    if (subcategory) {
+      filter.subcategory = subcategory;
+    }
+
+    const deleted = await GlobalBranchStock.findOneAndDelete(filter);
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: "O‘chirish uchun mahsulot topilmadi",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Mahsulot faqat shu filialdan o‘chirildi ✅",
+      data: {
+        _id: deleted._id,
+        branch_code: deleted.branch_code,
+        mahsulot: deleted.mahsulot,
+        category: deleted.category || "",
+        subcategory: deleted.subcategory || "",
+      },
+    });
+  } catch (err) {
+    console.error("deleteBranchStockProductByName error:", err);
     return res.status(500).json({
       success: false,
       message: "Server xatosi",

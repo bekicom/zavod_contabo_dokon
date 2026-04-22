@@ -78,3 +78,11 @@ app.use((err, req, res, next) => {
 // server run boldi listen
 
 module.exports = app;
+
+// Local run support
+if (require.main === module) {
+  const PORT = process.env.PORT || 8060;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Zavod backend ishga tushdi: http://0.0.0.0:${PORT}`);
+  });
+}
