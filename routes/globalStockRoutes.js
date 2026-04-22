@@ -48,6 +48,10 @@ router.post("/stock/seed", globalStockCtrl.seedBranchStock);
 // 📦 Filial → Global (o‘z omborini ko‘rish)
 router.get("/stocks", globalStockCtrl.getAllBranchStocks);
 router.get("/stock/:branch_code", globalStockCtrl.getBranchStock);
+router.delete(
+  "/stock/:branch_code/products/by-name",
+  globalStockCtrl.deleteBranchStockProductByName,
+);
 router.put(
   "/stock/:branch_code/products/:product_id",
   globalStockCtrl.updateBranchStockProduct,
@@ -55,10 +59,6 @@ router.put(
 router.delete(
   "/stock/:branch_code/products/:product_id",
   globalStockCtrl.deleteBranchStockProduct,
-);
-router.delete(
-  "/stock/:branch_code/products/by-name",
-  globalStockCtrl.deleteBranchStockProductByName,
 );
 
 // 🧾 Shop Orders
