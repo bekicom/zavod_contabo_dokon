@@ -14,6 +14,18 @@ const GlobalBranchStockSchema = new mongoose.Schema(
       trim: true,
     },
 
+    category: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    subcategory: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     birlik: {
       type: String,
       enum: ["kg", "dona", "pachka", "blok"],
@@ -70,5 +82,7 @@ GlobalBranchStockSchema.index(
   { branch_code: 1, mahsulot: 1 },
   { unique: true },
 );
+
+GlobalBranchStockSchema.index({ branch_code: 1, category: 1, subcategory: 1 });
 
 module.exports = mongoose.model("GlobalBranchStock", GlobalBranchStockSchema);
