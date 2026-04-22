@@ -12,6 +12,8 @@ const {
   getOrderById,
 } = require("../controllers/shopOrder.controller");
 
+const factoryReturnCtrl = require("../controllers/factoryReturn.controller");
+
 // 🏭 Factory catalog management (global)
 router.get("/", globalStockCtrl.getAllBranchStocks);
 router.post("/factory/categories", globalStockCtrl.createFactoryCategory);
@@ -60,6 +62,13 @@ router.delete(
   "/stock/:branch_code/products/:product_id",
   globalStockCtrl.deleteBranchStockProduct,
 );
+
+// 🔄 Vazvrat workflow
+router.post("/returns", factoryReturnCtrl.createFactoryReturn);
+router.get("/returns", factoryReturnCtrl.getFactoryReturns);
+router.get("/returns/branch/:branch_code", factoryReturnCtrl.getFactoryReturnsByBranch);
+router.patch("/returns/:id/approve", factoryReturnCtrl.approveFactoryReturn);
+router.patch("/returns/:id/reject", factoryReturnCtrl.rejectFactoryReturn);
 
 // 🧾 Shop Orders
 router.post("/shop-orders", createOrder);
