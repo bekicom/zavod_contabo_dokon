@@ -5,6 +5,11 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
 const normalizeText = (value) => String(value || "").trim();
 const normalizeKey = (value) => normalizeText(value).toLowerCase();
 
+const parseQuantityInput = (value) => {
+  if (value === null || value === undefined || value === "") return NaN;
+  return Number(String(value).trim().replaceAll(",", "."));
+};
+
 const normalizeReturnItems = (payload) => {
   const rawItems = Array.isArray(payload?.items)
     ? payload.items
@@ -15,7 +20,7 @@ const normalizeReturnItems = (payload) => {
   return rawItems
     .map((raw) => {
       const product_name = normalizeText(raw?.mahsulot ?? raw?.name);
-      const soni = Number(raw?.soni ?? raw?.qty ?? raw?.count);
+      const soni = parseQuantityInput(raw?.soni ?? raw?.qty ?? raw?.count);
       const unit = normalizeText((raw?.birlik ?? raw?.unit) || "dona");
       const category_name = normalizeText(
         (raw?.category_name ?? raw?.category_title ?? raw?.category) || "",
@@ -29,6 +34,10 @@ const normalizeReturnItems = (payload) => {
 
       if (!Number.isFinite(soni) || soni < 1) {
         throw new Error(`Mahsulot soni noto‘g‘ri: ${product_name}`);
+      }
+
+      if (unit.toLowerCase() !== "kg" && !Number.isInteger(soni)) {
+        throw new Error(`${product_name} uchun miqdor butun son bo‘lishi kerak`);
       }
 
       return {
@@ -233,7 +242,7 @@ exports.approveFactoryReturn = async (req, res) => {
         });
       }
 
-      const qty = Number(item.soni || 0);
+      const qty = parseQuantityInput(item.soni || 0);
       const currentQty = Number(stock.miqdor || 0);
 
       if (currentQty < qty) {
@@ -247,7 +256,7 @@ exports.approveFactoryReturn = async (req, res) => {
 
     const now = new Date();
     for (const item of doc.items || []) {
-      const qty = Number(item.soni || 0);
+      const qty = parseQuantityInput(item.soni || 0);
       const stock = stockMap.get(normalizeKey(item.product_name));
 
       await GlobalBranchStock.findOneAndUpdate(

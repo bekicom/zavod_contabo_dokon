@@ -3,6 +3,11 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
 
 const normalizeName = (value) => String(value || "").trim().toLowerCase();
 
+const parseQuantityInput = (value) => {
+  if (value === null || value === undefined || value === "") return NaN;
+  return Number(String(value).trim().replaceAll(",", "."));
+};
+
 const normalizeItemForClient = (item, meta = {}) => {
   const price = Number(meta?.price ?? item?.price ?? 0);
   const requestedQty = Number(item?.soni || 0);
@@ -58,12 +63,13 @@ const normalizeOrderForClient = (order, itemMetaMap = null) => {
 const buildInitialOrderItems = (items) => {
   return (items || []).map((rawItem) => {
     const product_name = String(rawItem?.product_name || "").trim();
-    const soni = Number(rawItem?.soni);
+    const soni = parseQuantityInput(rawItem?.soni);
     const category_name = String(
       rawItem?.category_name || rawItem?.category_title || "",
     ).trim();
     const subcategory = String(rawItem?.subcategory || "").trim();
     const category = String(rawItem?.category || "").trim();
+    const unit = String(rawItem?.unit || "dona").trim().toLowerCase();
 
     if (!product_name) {
       throw new Error("Mahsulot nomi bo'sh bo'lishi mumkin emas");
@@ -71,6 +77,12 @@ const buildInitialOrderItems = (items) => {
 
     if (!Number.isFinite(soni) || soni < 1) {
       throw new Error(`Mahsulot soni noto'g'ri: ${product_name}`);
+    }
+
+    if (unit !== "kg" && !Number.isInteger(soni)) {
+      throw new Error(
+        `${product_name} uchun miqdor butun son bo'lishi kerak (${unit || "dona"})`,
+      );
     }
 
     return {
