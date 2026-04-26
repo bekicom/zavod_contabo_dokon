@@ -231,49 +231,40 @@ exports.approveFactoryReturn = async (req, res) => {
 
     const stockMap = new Map(stocks.map((stock) => [normalizeKey(stock.mahsulot), stock]));
 
-    for (const item of doc.items || []) {
-      const stock = stockMap.get(normalizeKey(item.product_name));
-
-      if (!stock) {
-        await session.abortTransaction();
-        return res.status(404).json({
-          success: false,
-          message: `${item.product_name} ushbu filial omborida topilmadi`,
-        });
-      }
-
-      const qty = parseQuantityInput(item.soni || 0);
-      const currentQty = Number(stock.miqdor || 0);
-
-      if (currentQty < qty) {
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          message: `${item.product_name} uchun omborda yetarli miqdor yo‘q (${currentQty} < ${qty})`,
-        });
-      }
-    }
-
     const now = new Date();
     for (const item of doc.items || []) {
       const qty = parseQuantityInput(item.soni || 0);
       const stock = stockMap.get(normalizeKey(item.product_name));
+      const historyPrice = Number(stock?.price || 0);
 
       await GlobalBranchStock.findOneAndUpdate(
-        { _id: stock._id, branch_code: doc.branch_code },
+        { branch_code: doc.branch_code, mahsulot: item.product_name },
         {
+          $setOnInsert: {
+            category: item.category || item.category_name || "",
+            subcategory: item.subcategory || "",
+            birlik: item.unit || "dona",
+            source: "factory",
+            price: historyPrice,
+          },
           $inc: { miqdor: -qty },
           $push: {
             tarix: {
               miqdor: -qty,
-              price: Number(stock.price || 0),
+              price: historyPrice,
               amal: "minus",
               izoh: `return:${doc._id}`,
               sana: now,
             },
           },
         },
-        { session, new: true },
+        {
+          session,
+          new: true,
+          upsert: true,
+          runValidators: true,
+          setDefaultsOnInsert: true,
+        },
       );
     }
 
@@ -286,7 +277,7 @@ exports.approveFactoryReturn = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Vazvrat tasdiqlandi, ombor kamaytirildi ✅",
+      message: "Vazvrat tasdiqlandi, dokon ombori kamaytirildi ✅",
       data: doc,
     });
   } catch (err) {
