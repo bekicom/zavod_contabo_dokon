@@ -411,10 +411,10 @@ exports.receiveOrder = async (req, res) => {
       });
     }
 
-    if (order.status !== "APPROVED") {
+    if (!["APPROVED", "PARTIAL"].includes(String(order.status || "").toUpperCase())) {
       return res.status(400).json({
         success: false,
-        message: "Faqat APPROVED order qabul qilinadi",
+        message: "Faqat APPROVED yoki PARTIAL order qabul qilinadi",
       });
     }
 
