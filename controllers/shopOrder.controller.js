@@ -57,7 +57,46 @@ const normalizeOrderForClient = (order, itemMetaMap = null) => {
           };
       return normalizeItemForClient(item, meta);
     }),
+    shipment_rounds: (safeOrder.shipment_rounds || []).map((round) => ({
+      ...round,
+      items: (round.items || []).map((item) => ({
+        ...item,
+        sent_soni: Number(item.soni || 0),
+      })),
+    })),
   };
+};
+
+const buildShipmentRoundItems = (previousItems, nextItems) => {
+  const previousMap = new Map(
+    (previousItems || []).map((item) => [normalizeName(item?.product_name), item]),
+  );
+
+  return (nextItems || [])
+    .map((nextItem) => {
+      const previousItem = previousMap.get(normalizeName(nextItem?.product_name)) || {};
+      const previousApproved = Number(previousItem.approved_soni || 0);
+      const nextApproved = Number(nextItem.approved_soni || 0);
+      const dispatchedQty = nextApproved - previousApproved;
+
+      if (!Number.isFinite(dispatchedQty) || dispatchedQty <= 0) {
+        return null;
+      }
+
+      return {
+        product_name: nextItem.product_name,
+        soni: dispatchedQty,
+        unit: nextItem.unit || previousItem.unit || "dona",
+        category_name: String(
+          nextItem.category_name || previousItem.category_name || "",
+        ).trim(),
+        subcategory: String(
+          nextItem.subcategory || previousItem.subcategory || "",
+        ).trim(),
+        category: String(nextItem.category || previousItem.category || "").trim(),
+      };
+    })
+    .filter(Boolean);
 };
 
 const buildInitialOrderItems = (items) => {
@@ -206,7 +245,7 @@ exports.createOrder = async (req, res) => {
 };
 
 /* =========================
-   GET ALL ORDERS (RECEIVED ko‘rsatmaymiz)
+   GET ALL ORDERS
 ========================= */
 exports.getAllOrders = async (req, res) => {
   try {
@@ -215,10 +254,16 @@ exports.getAllOrders = async (req, res) => {
     let filter = {};
 
     if (status) {
-      filter.status = status;
-    } else {
-      // default holda RECEIVED ko‘rsatmaymiz
-      filter.status = { $ne: "RECEIVED" };
+      const normalizedStatus = String(status).trim().toUpperCase();
+
+      if (normalizedStatus === "PENDING") {
+        // Frontend eski oqimda ko'pincha faqat PENDING so'raydi.
+        // Aktiv zakazlar qisman yoki to'liq tasdiqlangandan keyin ham
+        // dokon qabul qilguncha ro'yxatda qolishi kerak.
+        filter.status = { $in: ["PENDING", "PARTIAL", "APPROVED"] };
+      } else {
+        filter.status = normalizedStatus;
+      }
     }
 
     const orders = await ShopOrder.find(filter).sort({ createdAt: -1 }).lean();
@@ -298,6 +343,90 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
+exports.getOrderShipmentRounds = async (req, res) => {
+  try {
+    const order = await ShopOrder.findById(req.params.id).lean();
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order topilmadi",
+      });
+    }
+
+    const rounds = (order.shipment_rounds || []).map((round) => ({
+      ...round,
+      items: (round.items || []).map((item) => ({
+        ...item,
+        sent_soni: Number(item.soni || 0),
+      })),
+    }));
+
+    res.json({
+      success: true,
+      order_id: String(order._id),
+      shop_name: order.shop_name,
+      count: rounds.length,
+      data: rounds,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+exports.getOrderShipmentRoundByNo = async (req, res) => {
+  try {
+    const order = await ShopOrder.findById(req.params.id).lean();
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order topilmadi",
+      });
+    }
+
+    const roundNo = Number(req.params.round_no);
+    if (!Number.isInteger(roundNo) || roundNo < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "round_no noto'g'ri",
+      });
+    }
+
+    const round = (order.shipment_rounds || []).find(
+      (shipmentRound) => Number(shipmentRound.round_no) === roundNo,
+    );
+
+    if (!round) {
+      return res.status(404).json({
+        success: false,
+        message: "Shipment round topilmadi",
+      });
+    }
+
+    res.json({
+      success: true,
+      order_id: String(order._id),
+      shop_name: order.shop_name,
+      data: {
+        ...round,
+        items: (round.items || []).map((item) => ({
+          ...item,
+          sent_soni: Number(item.soni || 0),
+        })),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 /* =========================
    APPROVE ORDER
 ========================= */
@@ -330,6 +459,10 @@ exports.approveOrder = async (req, res) => {
       });
     }
 
+    const previousItems = (order.items || []).map((item) =>
+      item && typeof item.toObject === "function" ? item.toObject() : { ...item },
+    );
+
     const { items: nextItems, approvedInThisRound } = normalizeApprovedItems(
       req.body?.items,
       order.items,
@@ -341,6 +474,22 @@ exports.approveOrder = async (req, res) => {
     if (approvedInThisRound > 0 || !stillPending) {
       order.approved_at = new Date();
     }
+
+    if (approvedInThisRound > 0) {
+      const roundItems = buildShipmentRoundItems(previousItems, nextItems);
+      const nextRoundNo = Number((order.shipment_rounds || []).length || 0) + 1;
+      order.shipment_rounds = [
+        ...(order.shipment_rounds || []),
+        {
+          round_no: nextRoundNo,
+          sent_at: new Date(),
+          status_after: order.status,
+          total_quantity: approvedInThisRound,
+          items: roundItems,
+        },
+      ];
+    }
+
     await order.save();
 
     res.json({

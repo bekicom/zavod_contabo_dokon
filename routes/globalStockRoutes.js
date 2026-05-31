@@ -10,6 +10,8 @@ const {
   rejectOrder,
   receiveOrder, // 👈 MUHIM: qo‘shildi
   getOrderById,
+  getOrderShipmentRounds,
+  getOrderShipmentRoundByNo,
 } = require("../controllers/shopOrder.controller");
 
 const factoryReturnCtrl = require("../controllers/factoryReturn.controller");
@@ -70,12 +72,15 @@ router.get("/returns/branch/:branch_code", factoryReturnCtrl.getFactoryReturnsBy
 router.patch("/returns/:id/approve", factoryReturnCtrl.approveFactoryReturn);
 router.patch("/returns/:id/reject", factoryReturnCtrl.rejectFactoryReturn);
 
+
 // 🧾 Shop Orders
 router.post("/shop-orders", createOrder);
 router.get("/shop-orders", getAllOrders);
 router.patch("/shop-orders/:id/approve", approveOrder);
 router.patch("/shop-orders/:id/reject", rejectOrder);
 router.patch("/shop-orders/:id/receive", receiveOrder);
+router.get("/shop-orders/:id/shipments", getOrderShipmentRounds);
+router.get("/shop-orders/:id/shipments/:round_no", getOrderShipmentRoundByNo);
 router.get("/shop-orders/:id", getOrderById);
 
 // 🔄 Zavod queue sync endpoint (legacy compatibility)

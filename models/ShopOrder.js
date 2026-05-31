@@ -74,6 +74,71 @@ const OrderItemSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const ShipmentRoundItemSchema = new mongoose.Schema(
+  {
+    product_name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    soni: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    unit: {
+      type: String,
+      default: "dona",
+      trim: true,
+    },
+    category_name: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    subcategory: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    category: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
+const ShipmentRoundSchema = new mongoose.Schema(
+  {
+    round_no: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    sent_at: {
+      type: Date,
+      default: Date.now,
+    },
+    status_after: {
+      type: String,
+      enum: ["PENDING", "PARTIAL", "APPROVED", "REJECTED", "RECEIVED"],
+      default: "PARTIAL",
+    },
+    total_quantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    items: {
+      type: [ShipmentRoundItemSchema],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
 const ShopOrderSchema = new mongoose.Schema(
   {
     shop_name: {
@@ -96,6 +161,10 @@ const ShopOrderSchema = new mongoose.Schema(
 
     approved_at: Date,
     received_at: Date,
+    shipment_rounds: {
+      type: [ShipmentRoundSchema],
+      default: [],
+    },
   },
   { timestamps: true },
 );
