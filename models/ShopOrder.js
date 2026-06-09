@@ -121,6 +121,10 @@ const ShipmentRoundSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    received_at: {
+      type: Date,
+      default: null,
+    },
     status_after: {
       type: String,
       enum: ["PENDING", "PARTIAL", "APPROVED", "REJECTED", "RECEIVED"],

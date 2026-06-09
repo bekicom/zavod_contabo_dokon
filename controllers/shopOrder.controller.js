@@ -567,14 +567,37 @@ exports.receiveOrder = async (req, res) => {
       });
     }
 
-    order.status = "RECEIVED";
-    order.received_at = new Date();
+    const receivedAt = new Date();
+    const unreceivedRounds = (order.shipment_rounds || []).filter(
+      (round) => !round.received_at,
+    );
+
+    if (unreceivedRounds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Qabul qilish uchun yangi jo'natma topilmadi",
+      });
+    }
+
+    for (const round of unreceivedRounds) {
+      round.received_at = receivedAt;
+    }
+
+    const stillPending = (order.items || []).some(
+      (item) => Number(item.pending_soni ?? 0) > 0,
+    );
+    order.status = stillPending ? "PARTIAL" : "RECEIVED";
+    if (!stillPending) {
+      order.received_at = receivedAt;
+    }
     await order.save();
 
     res.json({
       success: true,
-      message: "Order qabul qilindi",
-      data: order,
+      message: stillPending
+        ? "Jo'natma qabul qilindi, qolgan mahsulotlar kutilyapti"
+        : "Order to'liq qabul qilindi",
+      data: normalizeOrderForClient(order),
     });
   } catch (error) {
     res.status(500).json({
