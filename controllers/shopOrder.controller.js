@@ -573,6 +573,21 @@ exports.receiveOrder = async (req, res) => {
     );
 
     if (unreceivedRounds.length === 0) {
+      if (
+        (!Array.isArray(order.shipment_rounds) || order.shipment_rounds.length === 0) &&
+        String(order.status || "").toUpperCase() === "APPROVED"
+      ) {
+        order.status = "RECEIVED";
+        order.received_at = receivedAt;
+        await order.save();
+
+        return res.json({
+          success: true,
+          message: "Order qabul qilindi",
+          data: normalizeOrderForClient(order),
+        });
+      }
+
       return res.status(400).json({
         success: false,
         message: "Qabul qilish uchun yangi jo'natma topilmadi",
