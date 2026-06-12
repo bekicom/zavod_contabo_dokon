@@ -575,15 +575,20 @@ exports.receiveOrder = async (req, res) => {
     if (unreceivedRounds.length === 0) {
       if (
         (!Array.isArray(order.shipment_rounds) || order.shipment_rounds.length === 0) &&
-        String(order.status || "").toUpperCase() === "APPROVED"
+        ["APPROVED", "PARTIAL"].includes(String(order.status || "").toUpperCase())
       ) {
-        order.status = "RECEIVED";
+        const stillPending = (order.items || []).some(
+          (item) => Number(item.pending_soni ?? 0) > 0,
+        );
+        order.status = stillPending ? "PARTIAL" : "RECEIVED";
         order.received_at = receivedAt;
         await order.save();
 
         return res.json({
           success: true,
-          message: "Order qabul qilindi",
+          message: stillPending
+            ? "Jo'natma qabul qilindi, qolgan mahsulotlar kutilyapti"
+            : "Order qabul qilindi",
           data: normalizeOrderForClient(order),
         });
       }
