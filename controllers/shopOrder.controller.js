@@ -335,17 +335,8 @@ exports.getAllOrders = async (req, res) => {
       DEFAULT_ORDER_LIMIT,
     );
     const limit = Math.min(requestedLimit, MAX_ORDER_LIMIT);
-    const includeHistory =
-      String(req.query?.history || "").trim().toLowerCase() === "true" ||
-      Boolean(req.query?.from || req.query?.to) ||
-      requestedLimit > DEFAULT_ORDER_LIMIT;
 
     const filter = {};
-
-    if (!includeHistory) {
-      filter.report_only = { $ne: true };
-    }
-
     const shopName = normalizeBranchCode(
       req.query?.shop_name ||
         req.query?.filial ||
