@@ -163,6 +163,12 @@ const ShopOrderSchema = new mongoose.Schema(
       default: "PENDING",
     },
 
+    report_only: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
     approved_at: Date,
     received_at: Date,
     shipment_rounds: {
@@ -175,6 +181,7 @@ const ShopOrderSchema = new mongoose.Schema(
 
 ShopOrderSchema.index({ shop_name: 1, status: 1, createdAt: -1 });
 ShopOrderSchema.index({ status: 1, createdAt: -1 });
+ShopOrderSchema.index({ report_only: 1, createdAt: -1 });
 ShopOrderSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("ShopOrder", ShopOrderSchema);
