@@ -12,7 +12,7 @@ const OrderItemSchema = new mongoose.Schema(
       // so‘ralgan jami son
       type: Number,
       required: true,
-      min: 1,
+      min: 0,
     },
 
     approved_soni: {
@@ -172,5 +172,9 @@ const ShopOrderSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+ShopOrderSchema.index({ shop_name: 1, status: 1, createdAt: -1 });
+ShopOrderSchema.index({ status: 1, createdAt: -1 });
+ShopOrderSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("ShopOrder", ShopOrderSchema);

@@ -3,18 +3,91 @@ const GlobalBranchStock = require("../models/GlobalBranchStock");
 
 const normalizeName = (value) => String(value || "").trim().toLowerCase();
 
+const normalizeBranchCode = (value) => String(value || "").trim().toLowerCase();
+
+const DEFAULT_ORDER_LIMIT = 100;
+const MAX_ORDER_LIMIT = 5000;
+
+const parsePositiveInteger = (value, fallback) => {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const parseOrderDate = (value, endOfDay = false) => {
+  const text = String(value || "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+
+  if (!match) {
+    const error = new Error("Sana YYYY-MM-DD formatida bo'lishi kerak");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(
+    Date.UTC(
+      year,
+      month - 1,
+      day,
+      endOfDay ? 23 : 0,
+      endOfDay ? 59 : 0,
+      endOfDay ? 59 : 0,
+      endOfDay ? 999 : 0,
+    ),
+  );
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    const error = new Error("Sana noto'g'ri");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return date;
+};
+
 const parseQuantityInput = (value) => {
   if (value === null || value === undefined || value === "") return NaN;
   return Number(String(value).trim().replaceAll(",", "."));
 };
 
+const allowsFractionalQuantity = (unit) =>
+  [
+    "kg",
+    "g",
+    "gr",
+    "gram",
+    "gramm",
+    "litr",
+    "l",
+    "ml",
+    "m",
+    "metr",
+    "sm",
+  ].includes(String(unit || "").trim().toLowerCase());
+
+const normalizeQuantityByUnit = (quantity, unit) => {
+  const normalizedUnit = String(unit || "").trim().toLowerCase();
+
+  if (["g", "gr", "gram", "gramm"].includes(normalizedUnit)) {
+    return Number(quantity) / 1000;
+  }
+
+  return Number(quantity);
+};
+
 const normalizeItemForClient = (item, meta = {}) => {
   const price = Number(meta?.price ?? item?.price ?? 0);
-  const requestedQty = Number(item?.soni || 0);
-  const approvedQty = Number(item?.approved_soni || 0);
+  const requestedQty = parseQuantityInput(item?.soni || 0);
+  const approvedQty = parseQuantityInput(item?.approved_soni || 0);
   const pendingQtyRaw =
     item?.pending_soni !== undefined && item?.pending_soni !== null
-      ? Number(item.pending_soni)
+      ? parseQuantityInput(item.pending_soni)
       : requestedQty - approvedQty;
   const pendingQty = Math.max(Number(pendingQtyRaw || 0), 0);
 
@@ -75,8 +148,8 @@ const buildShipmentRoundItems = (previousItems, nextItems) => {
   return (nextItems || [])
     .map((nextItem) => {
       const previousItem = previousMap.get(normalizeName(nextItem?.product_name)) || {};
-      const previousApproved = Number(previousItem.approved_soni || 0);
-      const nextApproved = Number(nextItem.approved_soni || 0);
+      const previousApproved = parseQuantityInput(previousItem.approved_soni || 0);
+      const nextApproved = parseQuantityInput(nextItem.approved_soni || 0);
       const dispatchedQty = nextApproved - previousApproved;
 
       if (!Number.isFinite(dispatchedQty) || dispatchedQty <= 0) {
@@ -114,11 +187,17 @@ const buildInitialOrderItems = (items) => {
       throw new Error("Mahsulot nomi bo'sh bo'lishi mumkin emas");
     }
 
-    if (!Number.isFinite(soni) || soni < 1) {
+    if (!Number.isFinite(soni) || soni <= 0) {
       throw new Error(`Mahsulot soni noto'g'ri: ${product_name}`);
     }
 
-    if (unit !== "kg" && !Number.isInteger(soni)) {
+    const normalizedSoni = normalizeQuantityByUnit(soni, unit);
+
+    if (!Number.isFinite(normalizedSoni) || normalizedSoni <= 0) {
+      throw new Error(`Mahsulot soni noto'g'ri: ${product_name}`);
+    }
+
+    if (!allowsFractionalQuantity(unit) && !Number.isInteger(normalizedSoni)) {
       throw new Error(
         `${product_name} uchun miqdor butun son bo'lishi kerak (${unit || "dona"})`,
       );
@@ -126,9 +205,9 @@ const buildInitialOrderItems = (items) => {
 
     return {
       product_name,
-      soni,
+      soni: normalizedSoni,
       approved_soni: 0,
-      pending_soni: soni,
+      pending_soni: normalizedSoni,
       unit: rawItem?.unit || "dona",
       category_name,
       subcategory,
@@ -158,13 +237,13 @@ const normalizeApprovedItems = (incomingItems, existingItems) => {
   const normalizedItems = (existingItems || []).map((existingItem) => {
     const key = normalizeName(existingItem.product_name);
     const incoming = incomingMap.get(key);
-    const requestedQty = Number(existingItem.soni || 0);
-    const alreadyApproved = Number(existingItem.approved_soni || 0);
+    const requestedQty = parseQuantityInput(existingItem.soni || 0);
+    const alreadyApproved = parseQuantityInput(existingItem.approved_soni || 0);
     const pendingBefore = Math.max(requestedQty - alreadyApproved, 0);
 
     let dispatchQty = pendingBefore;
     if (Array.isArray(incomingItems)) {
-      dispatchQty = incoming ? Number(incoming.soni) : 0;
+      dispatchQty = incoming ? parseQuantityInput(incoming.soni) : 0;
     }
 
     if (!Number.isFinite(dispatchQty) || dispatchQty < 0) {
@@ -250,8 +329,24 @@ exports.createOrder = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
   try {
     const { status } = req.query;
+    const page = parsePositiveInteger(req.query?.page, 1);
+    const requestedLimit = parsePositiveInteger(
+      req.query?.limit,
+      DEFAULT_ORDER_LIMIT,
+    );
+    const limit = Math.min(requestedLimit, MAX_ORDER_LIMIT);
 
-    let filter = {};
+    const filter = {};
+    const shopName = normalizeBranchCode(
+      req.query?.shop_name ||
+        req.query?.filial ||
+        req.query?.branch_code ||
+        req.query?.shop,
+    );
+
+    if (shopName) {
+      filter.shop_name = shopName;
+    }
 
     if (status) {
       const normalizedStatus = String(status).trim().toUpperCase();
@@ -266,7 +361,37 @@ exports.getAllOrders = async (req, res) => {
       }
     }
 
-    const orders = await ShopOrder.find(filter).sort({ createdAt: -1 }).lean();
+    if (req.query?.from || req.query?.to) {
+      filter.createdAt = {};
+
+      if (req.query?.from) {
+        filter.createdAt.$gte = parseOrderDate(req.query.from);
+      }
+
+      if (req.query?.to) {
+        filter.createdAt.$lte = parseOrderDate(req.query.to, true);
+      }
+
+      if (
+        filter.createdAt.$gte &&
+        filter.createdAt.$lte &&
+        filter.createdAt.$gte > filter.createdAt.$lte
+      ) {
+        const error = new Error("from sanasi to sanasidan katta bo'lishi mumkin emas");
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    const skip = (page - 1) * limit;
+    const [orders, total] = await Promise.all([
+      ShopOrder.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      ShopOrder.countDocuments(filter),
+    ]);
 
     const branchCodes = [...new Set(orders.map((order) => order.shop_name).filter(Boolean))];
     const productNames = [
@@ -307,10 +432,14 @@ exports.getAllOrders = async (req, res) => {
     res.json({
       success: true,
       count: enrichedOrders.length,
+      total,
+      page,
+      limit,
+      pages: total === 0 ? 0 : Math.ceil(total / limit),
       data: enrichedOrders,
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       message: error.message,
     });
@@ -322,6 +451,13 @@ exports.getAllOrders = async (req, res) => {
 ========================= */
 exports.getOrderById = async (req, res) => {
   try {
+    if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ""))) {
+      return res.status(404).json({
+        success: false,
+        message: "Order topilmadi",
+      });
+    }
+
     const order = await ShopOrder.findById(req.params.id);
 
     if (!order) {
@@ -449,7 +585,7 @@ exports.approveOrder = async (req, res) => {
     }
 
     const hasPending = (order.items || []).some(
-      (item) => Number(item.pending_soni ?? item.soni ?? 0) > 0,
+      (item) => parseQuantityInput(item.pending_soni ?? item.soni ?? 0) > 0,
     );
 
     if (!hasPending) {
