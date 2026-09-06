@@ -196,6 +196,8 @@ exports.approveFactoryReturn = async (req, res) => {
   try {
     const returnId = normalizeText(req.params?.id);
     const approved_by = normalizeText(req.body?.approved_by);
+    const confirmedBranch = normalizeKey(req.body?.branch_code);
+    const confirmationSource = normalizeKey(req.body?.confirmation_source);
 
     if (!mongoose.Types.ObjectId.isValid(returnId)) {
       return res.status(400).json({
@@ -216,10 +218,37 @@ exports.approveFactoryReturn = async (req, res) => {
     }
 
     if (doc.status !== "PENDING") {
+      if (doc.status === "APPROVED") {
+        await session.abortTransaction();
+        return res.json({
+          success: true,
+          already_approved: true,
+          message: "Vazvrat oldin tasdiqlangan",
+          data: doc,
+        });
+      }
+
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
         message: "Faqat PENDING vazvrat tasdiqlanadi",
+      });
+    }
+
+    // Vazvratni faqat filialning lokal ombori muvaffaqiyatli
+    // kamaytirilgandan keyin tasdiqlash mumkin. Operator dasturidan yoki
+    // eski klientdan keladigan oddiy /approve chaqiruvi PENDING yozuvni
+    // o'z-o'zidan tasdiqlab yubormaydi.
+    if (
+      confirmationSource !== "local-stock-deduction" ||
+      !confirmedBranch ||
+      confirmedBranch !== normalizeKey(doc.branch_code)
+    ) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message:
+          "Vazvrat filialda ko'rilib, lokal ombor kamaytirilgandan keyin tasdiqlanadi",
       });
     }
 
