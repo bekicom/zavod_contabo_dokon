@@ -235,21 +235,44 @@ exports.approveFactoryReturn = async (req, res) => {
       });
     }
 
-    // Vazvratni faqat filialning lokal ombori muvaffaqiyatli
-    // kamaytirilgandan keyin tasdiqlash mumkin. Operator dasturidan yoki
-    // eski klientdan keladigan oddiy /approve chaqiruvi PENDING yozuvni
-    // o'z-o'zidan tasdiqlab yubormaydi.
-    if (
-      confirmationSource !== "local-stock-deduction" ||
-      !confirmedBranch ||
-      confirmedBranch !== normalizeKey(doc.branch_code)
-    ) {
-      await session.abortTransaction();
-      return res.status(403).json({
-        success: false,
-        message:
-          "Vazvrat filialda ko'rilib, lokal ombor kamaytirilgandan keyin tasdiqlanadi",
-      });
+    // AVTO-TASDIQDAN HIMOYA (filial ilovalarini yangilamasdan ishlaydi):
+    // 1) Lokal-ombor isboti bilan kelgan tasdiq (yangi filial backendlari)
+    //    darhol qabul qilinadi.
+    // 2) Isbotsiz (eski filial ilovalari) tasdiq faqat quyidagicha o'tadi:
+    //    - tasdiqlovchi vazvratni YARATGAN odam bo'lmasa (zavod o'zini
+    //      o'zi tasdiqlashi bloklanadi), VA
+    //    - yaratilganidan kamida 2 daqiqa o'tgan bo'lsa (zavod ilovasining
+    //      5 soniyalik avto-tasdig'i bloklanadi; filial esa bemalol
+    //      tasdiqlayveradi).
+    const hasLocalConfirmation =
+      confirmationSource === "local-stock-deduction" &&
+      confirmedBranch &&
+      confirmedBranch === normalizeKey(doc.branch_code);
+
+    if (!hasLocalConfirmation) {
+      const AUTO_APPROVE_LOCK_MS = 2 * 60 * 1000;
+      const ageMs = Date.now() - new Date(doc.createdAt || 0).getTime();
+      const sameActor =
+        approved_by &&
+        normalizeKey(approved_by) === normalizeKey(doc.created_by);
+
+      if (sameActor) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          message:
+            "Vazvratni yaratgan operator o'zi tasdiqlay olmaydi — uni filial dasturida tasdiqlashadi",
+        });
+      }
+
+      if (!Number.isFinite(ageMs) || ageMs < AUTO_APPROVE_LOCK_MS) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          message:
+            "Vazvrat endigina yaratildi — u filial dasturida ko'rilib tasdiqlanadi",
+        });
+      }
     }
 
     const productNames = [...new Set((doc.items || []).map((item) => item.product_name))];
