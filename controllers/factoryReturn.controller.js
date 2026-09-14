@@ -57,7 +57,18 @@ exports.createFactoryReturn = async (req, res) => {
     const branch_code = normalizeKey(req.body?.branch_code);
     const created_by = normalizeText(req.body?.created_by);
     const note = normalizeText(req.body?.note);
-    const items = normalizeReturnItems(req.body);
+
+    // Miqdor xatolari (kasr dona, 1 dan kichik son) foydalanuvchiga
+    // "Server xatosi" emas, aniq sabab bilan qaytsin
+    let items;
+    try {
+      items = normalizeReturnItems(req.body);
+    } catch (validationErr) {
+      return res.status(400).json({
+        success: false,
+        message: validationErr.message,
+      });
+    }
 
     if (!branch_code || items.length === 0) {
       return res.status(400).json({
