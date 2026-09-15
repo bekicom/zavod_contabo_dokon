@@ -26,9 +26,11 @@ const GlobalBranchStockSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Birlik enum bilan cheklanmaydi: kg, dona, litr, metr, pachka...
     birlik: {
       type: String,
-      enum: ["kg", "dona", "pachka", "blok"],
+      trim: true,
+      default: "dona",
     },
 
     miqdor: {

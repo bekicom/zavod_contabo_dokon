@@ -16,9 +16,10 @@ const ReturnItemSchema = new mongoose.Schema(
         message: "soni 0 dan katta son bo'lishi kerak",
       },
     },
+    // Birlik enum bilan cheklanmaydi: kg, dona, litr, metr, pachka...
     unit: {
       type: String,
-      enum: ["kg", "dona", "pachka", "blok"],
+      trim: true,
       default: "dona",
     },
     category_name: {
