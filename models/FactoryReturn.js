@@ -10,7 +10,11 @@ const ReturnItemSchema = new mongoose.Schema(
     soni: {
       type: Number,
       required: true,
-      min: 1,
+      // Kasr miqdorlar ruxsat (0.5 kg, 0.25 litr, 2.42...): faqat 0 dan katta
+      validate: {
+        validator: (v) => Number.isFinite(v) && v > 0,
+        message: "soni 0 dan katta son bo'lishi kerak",
+      },
     },
     unit: {
       type: String,
