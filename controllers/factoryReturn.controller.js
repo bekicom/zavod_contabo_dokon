@@ -32,12 +32,11 @@ const normalizeReturnItems = (payload) => {
         return null;
       }
 
-      if (!Number.isFinite(soni) || soni < 1) {
+      // Kasr miqdorlar BARCHA birliklar uchun ruxsat etiladi (0.5 kg,
+      // 1.2 kg, 0.25 litr, 2.42 dona...). Faqat 0 dan katta son bo'lsin;
+      // "1,2" ko'rinishi parseQuantityInput da "1.2" ga aylanadi.
+      if (!Number.isFinite(soni) || soni <= 0) {
         throw new Error(`Mahsulot soni noto‘g‘ri: ${product_name}`);
-      }
-
-      if (unit.toLowerCase() !== "kg" && !Number.isInteger(soni)) {
-        throw new Error(`${product_name} uchun miqdor butun son bo‘lishi kerak`);
       }
 
       return {
