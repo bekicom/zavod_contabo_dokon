@@ -339,8 +339,9 @@ exports.cleanupOldOrders = async (req, res) => {
     const days = Math.max(Number(req.query?.days) || 2, 1);
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    // Egasining talabi (2026-09-16): 2 kundan eski buyurtma holatidan
+    // qat'i nazar (PENDING bo'lsa ham) o'chiriladi.
     const filter = {
-      status: { $in: ["RECEIVED", "REJECTED"] },
       createdAt: { $lt: cutoff },
     };
 
