@@ -12,6 +12,7 @@ const {
   getOrderById,
   getOrderShipmentRounds,
   getOrderShipmentRoundByNo,
+  cleanupOldOrders,
 } = require("../controllers/shopOrder.controller");
 
 const factoryReturnCtrl = require("../controllers/factoryReturn.controller");
