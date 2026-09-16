@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "server.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/global/shop-orders/cleanup?days=2",
+      "schedule": "0 22 * * *"
+    }
   ]
 }

@@ -326,6 +326,44 @@ exports.createOrder = async (req, res) => {
 /* =========================
    GET ALL ORDERS
 ========================= */
+/* ===================================================
+   🧹 ESKI BUYURTMALARNI TOZALASH
+   GET/POST /api/global/shop-orders/cleanup?days=2
+   Faqat YAKUNLANGAN (RECEIVED/REJECTED) va berilgan kundan
+   eski buyurtmalar o'chiriladi. PENDING/APPROVED/PARTIAL
+   hech qachon o'chirilmaydi — ular ishlov kutayotgan zakazlar.
+   Vercel cron har kuni chaqiradi (vercel.json).
+=================================================== */
+exports.cleanupOldOrders = async (req, res) => {
+  try {
+    const days = Math.max(Number(req.query?.days) || 2, 1);
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const filter = {
+      status: { $in: ["RECEIVED", "REJECTED"] },
+      createdAt: { $lt: cutoff },
+    };
+
+    const count = await ShopOrder.countDocuments(filter);
+    const result = await ShopOrder.deleteMany(filter);
+
+    return res.json({
+      success: true,
+      message: `${result.deletedCount} ta eski (>${days} kun) yakunlangan buyurtma o'chirildi`,
+      matched: count,
+      deleted: result.deletedCount,
+      cutoff,
+    });
+  } catch (error) {
+    console.error("cleanupOldOrders error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Tozalashda xatolik",
+      error: error.message,
+    });
+  }
+};
+
 exports.getAllOrders = async (req, res) => {
   try {
     const { status } = req.query;

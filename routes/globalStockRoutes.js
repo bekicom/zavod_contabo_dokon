@@ -79,6 +79,8 @@ router.get("/shop-orders", getAllOrders);
 router.patch("/shop-orders/:id/approve", approveOrder);
 router.patch("/shop-orders/:id/reject", rejectOrder);
 router.patch("/shop-orders/:id/receive", receiveOrder);
+router.get("/shop-orders/cleanup", cleanupOldOrders);
+router.post("/shop-orders/cleanup", cleanupOldOrders);
 router.get("/shop-orders/:id/shipments", getOrderShipmentRounds);
 router.get("/shop-orders/:id/shipments/:round_no", getOrderShipmentRoundByNo);
 router.get("/shop-orders/:id", getOrderById);
