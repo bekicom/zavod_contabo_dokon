@@ -394,7 +394,12 @@ exports.getAllOrders = async (req, res) => {
         // Frontend eski oqimda ko'pincha faqat PENDING so'raydi.
         // Aktiv zakazlar qisman yoki to'liq tasdiqlangandan keyin ham
         // dokon qabul qilguncha ro'yxatda qolishi kerak.
-        filter.status = { $in: ["PENDING", "PARTIAL", "APPROVED"] };
+        // RECEIVED ham qo'shildi: zavod admin tasdiqlagan va do'kon
+        // qabul qilgan zakaz ro'yxatdan darhol yo'qolmasin — bazada
+        // baribir faqat 2 kunlik saqlanadi (cleanup cron).
+        filter.status = {
+          $in: ["PENDING", "PARTIAL", "APPROVED", "RECEIVED"],
+        };
       } else {
         filter.status = normalizedStatus;
       }
